@@ -20,28 +20,43 @@ import android.widget.TextView
 import android.widget.Toast
 
 class OverlayService : Service() {
+
     private var windowManager: WindowManager? = null
     private var panel: LinearLayout? = null
 
     override fun onCreate() {
         super.onCreate()
         createNotification()
+
         if (!Settings.canDrawOverlays(this)) {
-            Toast.makeText(this, "ابتدا مجوز پنجره شناور را فعال کن.", Toast.LENGTH_LONG).show()
+            Toast.makeText(
+                this,
+                "ابتدا مجوز پنجره شناور را فعال کن.",
+                Toast.LENGTH_LONG
+            ).show()
             stopSelf()
             return
         }
+
         if (!showPanel()) {
-            Toast.makeText(this, "پنل باز نشد.", Toast.LENGTH_LONG).show()
+            Toast.makeText(
+                this,
+                "پنل باز نشد.",
+                Toast.LENGTH_LONG
+            ).show()
             stopSelf()
             return
         }
+
         running = true
         refreshTile()
     }
 
-    // اگر اندروید سرویس را متوقف کرد، پنل خودبه‌خود دوباره باز نشود.
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int
+    ): Int {
         super.onStartCommand(intent, flags, startId)
         return START_NOT_STICKY
     }
@@ -49,56 +64,87 @@ class OverlayService : Service() {
     private fun createNotification() {
         val channelId = "king_ai_running"
         val manager = getSystemService(NotificationManager::class.java)
+
         if (Build.VERSION.SDK_INT >= 26) {
-            manager.createNotificationChannel(NotificationChannel(
-                channelId, "KING AI", NotificationManager.IMPORTANCE_LOW
-            ))
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    channelId,
+                    "KING AI",
+                    NotificationManager.IMPORTANCE_LOW
+                )
+            )
         }
+
         val notification = if (Build.VERSION.SDK_INT >= 26) {
             Notification.Builder(this, channelId)
         } else {
             @Suppress("DEPRECATION")
             Notification.Builder(this)
-        }.setContentTitle("KING AI فعال است")
+        }
+            .setContentTitle("KING AI فعال است")
             .setContentText("پنجره شناور آماده است")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .build()
+
         startForeground(7, notification)
     }
 
     private fun showPanel(): Boolean {
-        windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
-        val input = EditText(this).apply { hint = "مثلاً: برو سایت موبایل پیدا کن" }
-        val status = TextView(this).apply {
-            text = "سلام! من KING AI هستم. نسخه آزمایشی ۰.۱"
-            textSize = 15f
+        windowManager =
+            getSystemService(WINDOW_SERVICE) as WindowManager
+
+        val input = EditText(this).apply {
+            hint = "مثلاً: شات بگیر"
+            textSize = 16f
         }
+
+        val status = TextView(this).apply {
+            text = "سلام! من KING AI هستم 👑"
+            textSize = 15f
+            setTextColor(0xFFFFFFFF.toInt())
+        }
+
         val close = Button(this).apply {
             text = "بستن"
-            setOnClickListener { stopSelf() }
-        }
-        val send = Button(this).apply {
-            text = "ارسال فرمان"
             setOnClickListener {
-                val command = input.text.toString().trim()
-                status.text = if (command.isEmpty()) "اول یک فرمان بنویس."
-                else "فرمان دریافت شد: $command\nمغز هوشمند و کنترل دستگاه در مرحله بعد متصل می‌شوند."
+                stopSelf()
             }
         }
+
+        val send = Button(this).apply {
+            text = "ارسال فرمان"
+
+            setOnClickListener {
+                val command = input.text.toString().trim()
+
+                if (command.isEmpty()) {
+                    status.text = "اول یک فرمان بنویس."
+                    return@setOnClickListener
+                }
+
+                handleCommand(command, status)
+            }
+        }
+
         val view = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(24, 20, 24, 20)
             setBackgroundColor(0xFF17251F.toInt())
-            addView(TextView(this@OverlayService).apply {
-                text = "👑 KING AI"
-                textSize = 20f
-                setTextColor(0xFFFFFFFF.toInt())
-            })
+
+            addView(
+                TextView(this@OverlayService).apply {
+                    text = "👑 KING AI"
+                    textSize = 20f
+                    setTextColor(0xFFFFFFFF.toInt())
+                }
+            )
+
             addView(status)
             addView(input)
             addView(send)
             addView(close)
         }
+
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -109,6 +155,7 @@ class OverlayService : Service() {
             gravity = Gravity.TOP
             y = 100
         }
+
         return try {
             windowManager?.addView(view, params)
             panel = view
@@ -119,17 +166,73 @@ class OverlayService : Service() {
         }
     }
 
-    // به کاشی خبر می‌دهد وضعیتش را دوباره از OverlayService.running بخواند.
+    private fun handleCommand(
+        command: String,
+        status: TextView
+    ) {
+        val normalized = command
+            .replace("‌", "")
+            .replace(" ", "")
+            .lowercase()
+
+        if (
+            normalized.contains("شاتبگیر") ||
+            normalized.contains("عکس‌بگیر") ||
+            normalized.contains("عکس بگیر") ||
+            normalized == "دوربین"
+        ) {
+            openCamera(status)
+            return
+        }
+
+        status.text =
+            "فرمان دریافت شد: $command\nاین فرمان هنوز به قابلیت مربوطه وصل نشده است."
+    }
+
+    private fun openCamera(status: TextView) {
+        try {
+            status.text = "در حال بازکردن دوربین KING AI..."
+
+            val cameraIntent = Intent(
+                this,
+                CameraCaptureActivity::class.java
+            ).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+
+            startActivity(cameraIntent)
+
+        } catch (e: Exception) {
+            status.text = "بازکردن دوربین ناموفق بود: ${e.message}"
+
+            Toast.makeText(
+                this,
+                "خطا در بازکردن دوربین",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
     private fun refreshTile() {
         try {
-            TileService.requestListeningState(this, ComponentName(this, KingTileService::class.java))
+            TileService.requestListeningState(
+                this,
+                ComponentName(this, KingTileService::class.java)
+            )
         } catch (_: Exception) {
         }
     }
 
     override fun onDestroy() {
         running = false
-        panel?.let { try { windowManager?.removeView(it) } catch (_: Exception) {} }
+
+        panel?.let {
+            try {
+                windowManager?.removeView(it)
+            } catch (_: Exception) {
+            }
+        }
+
         panel = null
         refreshTile()
         super.onDestroy()
@@ -138,7 +241,6 @@ class OverlayService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     companion object {
-        /** true فقط وقتی پنل واقعاً روی صفحه است. */
         @Volatile
         var running: Boolean = false
             private set
