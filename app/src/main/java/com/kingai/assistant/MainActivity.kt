@@ -32,10 +32,36 @@ class MainActivity : ComponentActivity() {
     private lateinit var dateView: TextView
     private lateinit var statusHost: LinearLayout
     private lateinit var historyHost: LinearLayout
+    private lateinit var saveFileButton: NeonButton
+
+    private var pendingFileContent: String? = null
 
     private var torchTile: QuickTile? = null
     private var built = false
     private var aiBusy = false
+
+    // انتخاب محل ذخیره فایل
+    private val createFileLauncher = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("text/plain")
+    ) { uri ->
+        if (uri == null) {
+            toast("ذخیره فایل لغو شد.")
+        } else {
+            val content = pendingFileContent
+
+            if (content.isNullOrBlank()) {
+                toast("پاسخی برای ذخیره وجود ندارد.")
+            } else {
+                val saved = FileSaver.save(this, uri, content)
+
+                if (saved) {
+                    toast("فایل با موفقیت ذخیره شد.")
+                } else {
+                    toast("ذخیره فایل ناموفق بود.")
+                }
+            }
+        }
+    }
 
     private val voiceLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -242,6 +268,26 @@ class MainActivity : ComponentActivity() {
         )
 
         cmdCard.addView(resultView, vlp(12))
+
+        // دکمه ذخیره پاسخ هوش مصنوعی
+        saveFileButton = NeonButton(
+            this,
+            "ذخیره پاسخ در فایل",
+            true
+        )
+
+        saveFileButton.isEnabled = false
+
+        saveFileButton.setOnClickListener {
+            if (pendingFileContent.isNullOrBlank()) {
+                toast("هنوز پاسخ هوش مصنوعی برای ذخیره وجود ندارد.")
+            } else {
+                createFileLauncher.launch("KING-AI-Response.txt")
+            }
+        }
+
+        cmdCard.addView(saveFileButton, vlp(12))
+
         content.addView(cmdCard, vlp(14))
         cmdCard.enter(370)
 
@@ -522,6 +568,11 @@ class MainActivity : ComponentActivity() {
         if (aiBusy) return
 
         aiBusy = true
+
+        // پاسخ قبلی تا زمان دریافت پاسخ جدید قابل ذخیره نیست.
+        pendingFileContent = null
+        saveFileButton.isEnabled = false
+
         resultView.setTextColor(Neon.GREEN)
         resultView.text = "🧠 در حال فکر کردن و دریافت پاسخ..."
 
@@ -537,6 +588,15 @@ class MainActivity : ComponentActivity() {
             )
 
             resultView.text = response.message
+
+            // فقط پاسخ موفق برای ذخیره آماده می‌شود.
+            pendingFileContent = if (response.success) {
+                response.message
+            } else {
+                null
+            }
+
+            saveFileButton.isEnabled = response.success
 
             HistoryStore.add(this, question, response.message)
             refreshHistory()
