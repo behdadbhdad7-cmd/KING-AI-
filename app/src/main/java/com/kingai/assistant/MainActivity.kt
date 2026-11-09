@@ -560,3 +560,88 @@ class MainActivity : ComponentActivity() {
         saveFileButton.isEnabled = false
         resultView.setTextColor(Neon.GREEN)
         resultView.text
+                resultView.text = "در حال فکر کردن..."
+
+        hideKeyboard()
+
+        ApiClient.sendMessage(this, question) { response ->
+            if (isFinishing || isDestroyed) return@sendMessage
+
+            aiBusy = false
+
+            resultView.setTextColor(
+                if (response.success) Neon.GREEN_SOFT
+                else Neon.AMBER
+            )
+
+            resultView.text = response.message
+
+            pendingFileContent =
+                if (response.success) response.message else null
+
+            saveFileButton.isEnabled = response.success
+
+            HistoryStore.add(this, question, response.message)
+            refreshHistory()
+            refreshStatus()
+        }
+    }
+
+    private fun hideKeyboard() {
+        val imm = getSystemService(INPUT_METHOD_SERVICE)
+            as InputMethodManager
+
+        imm.hideSoftInputFromWindow(input.windowToken, 0)
+    }
+
+    private fun startVoice() {
+        try {
+            voiceLauncher.launch(VoiceInput.createIntent())
+        } catch (_: Exception) {
+            toast("تشخیص گفتار در دسترس نیست.")
+        }
+    }
+
+    private fun startPanel() {
+        if (!Settings.canDrawOverlays(this)) {
+            toast("ابتدا مجوز پنل شناور را فعال کن.")
+            openOverlaySettings()
+            return
+        }
+
+        startService(Intent(this, OverlayService::class.java))
+        toast("پنل شناور فعال شد.")
+        refreshStatus()
+    }
+
+    private fun stopPanel() {
+        stopService(Intent(this, OverlayService::class.java))
+        toast("پنل شناور بسته شد.")
+        refreshStatus()
+    }
+
+    private fun openOverlaySettings() {
+        try {
+            startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName")
+                )
+            )
+        } catch (_: Exception) {
+            toast("باز کردن تنظیمات ناموفق بود.")
+        }
+    }
+
+    private fun toast(message: String) {
+        android.widget.Toast.makeText(
+            this,
+            message,
+            android.widget.Toast.LENGTH_SHORT
+        ).show()
+    }
+
+    private fun dp(value: Int): Int {
+        return (value * resources.displayMetrics.density).toInt()
+    }
+}
