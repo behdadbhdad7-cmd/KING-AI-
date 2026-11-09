@@ -1,3 +1,4 @@
+
 package com.kingai.assistant
 
 import android.app.Notification
@@ -6,27 +7,40 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.ComponentName
 import android.content.Intent
+import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.IBinder
 import android.provider.Settings
 import android.service.quicksettings.TileService
 import android.view.Gravity
+import android.view.MotionEvent
+import android.view.View
 import android.view.WindowManager
-import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import kotlin.math.max
 
 class OverlayService : Service() {
 
     private var windowManager: WindowManager? = null
     private var panel: LinearLayout? = null
+    private var params: WindowManager.LayoutParams? = null
 
-    private val router by lazy {
-        CommandRouter(this)
-    }
+    private var status: TextView? = null
+    private var input: EditText? = null
+    private var content: LinearLayout? = null
+    private var minimized = false
+
+    private val router by lazy { CommandRouter(this) }
+
+    private val green = 0xFF39FF14.toInt()
+    private val dark = 0xFF06140B.toInt()
+    private val white = Color.WHITE
+    private val dim = 0xFFB8D6C0.toInt()
 
     override fun onCreate() {
         super.onCreate()
@@ -39,7 +53,6 @@ class OverlayService : Service() {
                 "ابتدا مجوز پنجره شناور را فعال کن.",
                 Toast.LENGTH_LONG
             ).show()
-
             stopSelf()
             return
         }
@@ -50,7 +63,6 @@ class OverlayService : Service() {
                 "پنل باز نشد.",
                 Toast.LENGTH_LONG
             ).show()
-
             stopSelf()
             return
         }
@@ -64,12 +76,12 @@ class OverlayService : Service() {
         flags: Int,
         startId: Int
     ): Int {
-        super.onStartCommand(intent, flags, startId)
         return START_NOT_STICKY
     }
 
     private fun createNotification() {
         val channelId = "king_ai_running"
+
         val manager =
             getSystemService(NotificationManager::class.java)
 
@@ -83,112 +95,317 @@ class OverlayService : Service() {
             )
         }
 
-        val builder = if (Build.VERSION.SDK_INT >= 26) {
-            Notification.Builder(this, channelId)
-        } else {
-            @Suppress("DEPRECATION")
-            Notification.Builder(this)
-        }
+        val builder =
+            if (Build.VERSION.SDK_INT >= 26) {
+                Notification.Builder(this, channelId)
+            } else {
+                @Suppress("DEPRECATION")
+                Notification.Builder(this)
+            }
 
         val notification = builder
             .setContentTitle("KING AI فعال است")
-            .setContentText("پنجره شناور آماده است")
+            .setContentText("پنل شناور آماده استفاده است")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .build()
 
         startForeground(7, notification)
     }
 
-    private fun showPanel(): Boolean {
-        windowManager =
-            getSystemService(WINDOW_SERVICE) as WindowManager
-
-        val input = EditText(this).apply {
-            hint = "مثلاً: شات بگیر"
-            textSize = 16f
-            setSingleLine(false)
+    private fun panelBackground(): GradientDrawable {
+        return GradientDrawable().apply {
+            cornerRadius = dp(20).toFloat()
+            setColor(dark)
+            setStroke(dp(1), green)
         }
+    }
 
-        val status = TextView(this).apply {
-            text = "سلام! من KING AI هستم 👑"
-            textSize = 15f
-            setTextColor(0xFFFFFFFF.toInt())
-            setPadding(0, 12, 0, 12)
+    private fun makeText(
+        value: String,
+        size: Float,
+        color: Int
+    ): TextView {
+        return TextView(this).apply {
+            text = value
+            textSize = size
+            setTextColor(color)
+            setPadding(dp(8), dp(8), dp(8), dp(8))
         }
+    }
 
-        val send = Button(this).apply {
-            text = "ارسال فرمان"
-
-            setOnClickListener {
-                val command = input.text.toString().trim()
-
-                if (command.isEmpty()) {
-                    status.text = "اول یک فرمان بنویس."
-                    return@setOnClickListener
-                }
-
-                handleCommand(command, status)
+    private fun makeButton(
+        value: String,
+        action: () -> Unit
+    ): TextView {
+        return TextView(this).apply {
+            text = value
+            textSize = 14f
+            gravity = Gravity.CENTER
+            setTextColor(white)
+            setPadding(dp(14), dp(11), dp(14), dp(11))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(12).toFloat()
+                setColor(0xFF12351B.toInt())
+                setStroke(dp(1), green)
             }
+            isClickable = true
+            setOnClickListener { action() }
         }
+    }
 
-        val close = Button(this).apply {
-            text = "بستن"
+    private fun showPanel(): Boolean {
+        return try {
+            windowManager =
+                getSystemService(WINDOW_SERVICE) as WindowManager
 
-            setOnClickListener {
+            val root = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(12), dp(10), dp(12), dp(12))
+                background = panelBackground()
+                elevation = dp(12).toFloat()
+            }
+
+            val header = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+
+            val title = makeText(
+                "👑 KING AI",
+                19f,
+                green
+            ).apply {
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+            }
+
+            header.addView(
+                title,
+                LinearLayout.LayoutParams(0, -2, 1f)
+            )
+
+            val minimize = makeButton("−") {
+                toggleMinimize()
+            }
+
+            header.addView(
+                minimize,
+                LinearLayout.LayoutParams(dp(44), dp(42))
+            )
+
+            val close = makeButton("×") {
                 stopSelf()
             }
-        }
 
-        val view = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(24, 20, 24, 20)
-            setBackgroundColor(0xFF17251F.toInt())
-
-            addView(
-                TextView(this@OverlayService).apply {
-                    text = "👑 KING AI"
-                    textSize = 20f
-                    setTextColor(0xFFFFFFFF.toInt())
+            header.addView(
+                close,
+                LinearLayout.LayoutParams(dp(44), dp(42)).apply {
+                    marginStart = dp(6)
                 }
             )
 
-            addView(status)
-            addView(input)
-            addView(send)
-            addView(close)
-        }
+            root.addView(header)
 
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP
-            y = 100
-        }
+            // نوار عنوان برای جابه‌جایی پنل
+            header.setOnTouchListener(
+                createDragListener()
+            )
 
-        return try {
-            windowManager?.addView(view, params)
-            panel = view
+            content = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+            }
+
+            status = makeText(
+                "سلام! من KING AI هستم.\nمنتظر فرمان تو هستم.",
+                14f,
+                dim
+            )
+
+            content?.addView(status)
+
+            input = EditText(this).apply {
+                hint = "مثلاً: تلگرام را باز کن"
+                textSize = 14f
+                setTextColor(white)
+                setHintTextColor(dim)
+                setPadding(dp(12), dp(10), dp(12), dp(10))
+                setSingleLine(true)
+                background = GradientDrawable().apply {
+                    cornerRadius = dp(12).toFloat()
+                    setColor(0xFF020904.toInt())
+                    setStroke(dp(1), green)
+                }
+            }
+
+            content?.addView(
+                input,
+                LinearLayout.LayoutParams(
+                    -1,
+                    dp(50)
+                ).apply {
+                    topMargin = dp(8)
+                }
+            )
+
+            val send = makeButton("ارسال فرمان") {
+                executeCommand()
+            }
+
+            content?.addView(
+                send,
+                LinearLayout.LayoutParams(-1, -2).apply {
+                    topMargin = dp(8)
+                }
+            )
+
+            val quick = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+            }
+
+            quick.addView(
+                makeButton("گالری") {
+                    executeQuick("گالری")
+                },
+                LinearLayout.LayoutParams(0, -2, 1f)
+            )
+
+            quick.addView(
+                makeButton("چراغ") {
+                    executeQuick("چراغ قوه")
+                },
+                LinearLayout.LayoutParams(0, -2, 1f).apply {
+                    marginStart = dp(6)
+                }
+            )
+
+            quick.addView(
+                makeButton("دوربین") {
+                    executeQuick("دوربین")
+                },
+                LinearLayout.LayoutParams(0, -2, 1f).apply {
+                    marginStart = dp(6)
+                }
+            )
+
+            content?.addView(
+                quick,
+                LinearLayout.LayoutParams(-1, -2).apply {
+                    topMargin = dp(10)
+                }
+            )
+
+            root.addView(content)
+
+            val windowParams = WindowManager.LayoutParams(
+                minOf(
+                    resources.displayMetrics.widthPixels - dp(24),
+                    dp(380)
+                ),
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                PixelFormat.TRANSLUCENT
+            ).apply {
+                gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+                y = dp(100)
+            }
+
+            windowManager?.addView(root, windowParams)
+
+            panel = root
+            params = windowParams
+
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             panel = null
             false
         }
     }
 
-    private fun handleCommand(
-        command: String,
-        status: TextView
-    ) {
+    private fun createDragListener(): View.OnTouchListener {
+        var startX = 0
+        var startY = 0
+        var touchX = 0f
+        var touchY = 0f
+
+        return View.OnTouchListener { _, event ->
+            val p = params ?: return@OnTouchListener false
+
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    startX = p.x
+                    startY = p.y
+                    touchX = event.rawX
+                    touchY = event.rawY
+                    true
+                }
+
+                MotionEvent.ACTION_MOVE -> {
+                    p.x = startX +
+                        (event.rawX - touchX).toInt()
+
+                    p.y = startY +
+                        (event.rawY - touchY).toInt()
+
+                    try {
+                        windowManager?.updateViewLayout(
+                            panel,
+                            p
+                        )
+                    } catch (_: Exception) {
+                    }
+
+                    true
+                }
+
+                MotionEvent.ACTION_UP,
+                MotionEvent.ACTION_CANCEL -> true
+
+                else -> false
+            }
+        }
+    }
+
+    private fun toggleMinimize() {
+        val body = content ?: return
+
+        minimized = !minimized
+
+        body.visibility =
+            if (minimized) View.GONE else View.VISIBLE
+
+        panel?.let {
+            it.requestLayout()
+        }
+    }
+
+    private fun executeCommand() {
+        val command = input?.text
+            ?.toString()
+            ?.trim()
+            .orEmpty()
+
+        if (command.isEmpty()) {
+            status?.text = "اول یک فرمان بنویس."
+            return
+        }
+
+        executeQuick(command)
+        input?.setText("")
+    }
+
+    private fun executeQuick(command: String) {
         try {
-            status.text = "در حال اجرای فرمان..."
+            status?.text = "در حال اجرای فرمان..."
 
             val result = router.handle(command)
 
-            status.text = result.message
+            status?.text = result.message
+
+            status?.setTextColor(
+                if (result.success) green else 0xFFFFC107.toInt()
+            )
 
             HistoryStore.add(
                 this,
@@ -197,14 +414,8 @@ class OverlayService : Service() {
             )
 
         } catch (e: Exception) {
-            status.text =
-                "خطا در اجرای فرمان: ${e.message}"
-
-            Toast.makeText(
-                this,
-                "اجرای فرمان ناموفق بود",
-                Toast.LENGTH_LONG
-            ).show()
+            status?.text = "خطا در اجرای فرمان."
+            status?.setTextColor(0xFFFF5252.toInt())
         }
     }
 
@@ -221,6 +432,9 @@ class OverlayService : Service() {
         }
     }
 
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
+
     override fun onDestroy() {
         running = false
 
@@ -232,6 +446,11 @@ class OverlayService : Service() {
         }
 
         panel = null
+        content = null
+        status = null
+        input = null
+        params = null
+
         refreshTile()
 
         super.onDestroy()
