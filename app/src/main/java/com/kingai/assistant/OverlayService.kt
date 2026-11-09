@@ -4,11 +4,13 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.ComponentName
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
 import android.provider.Settings
+import android.service.quicksettings.TileService
 import android.view.Gravity
 import android.view.WindowManager
 import android.widget.Button
@@ -29,7 +31,19 @@ class OverlayService : Service() {
             stopSelf()
             return
         }
-        showPanel()
+        if (!showPanel()) {
+            Toast.makeText(this, "پنل باز نشد.", Toast.LENGTH_LONG).show()
+            stopSelf()
+            return
+        }
+        running = true
+        refreshTile()
+    }
+
+    // اگر اندروید سرویس را متوقف کرد، پنل خودبه‌خود دوباره باز نشود.
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        super.onStartCommand(intent, flags, startId)
+        return START_NOT_STICKY
     }
 
     private fun createNotification() {
@@ -52,7 +66,7 @@ class OverlayService : Service() {
         startForeground(7, notification)
     }
 
-    private fun showPanel() {
+    private fun showPanel(): Boolean {
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         val input = EditText(this).apply { hint = "مثلاً: برو سایت موبایل پیدا کن" }
         val status = TextView(this).apply {
@@ -71,7 +85,7 @@ class OverlayService : Service() {
                 else "فرمان دریافت شد: $command\nمغز هوشمند و کنترل دستگاه در مرحله بعد متصل می‌شوند."
             }
         }
-        panel = LinearLayout(this).apply {
+        val view = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(24, 20, 24, 20)
             setBackgroundColor(0xFF17251F.toInt())
@@ -85,26 +99,48 @@ class OverlayService : Service() {
             addView(send)
             addView(close)
         }
-        panel?.let { view ->
-            val params = WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
-                PixelFormat.TRANSLUCENT
-            ).apply {
-                gravity = Gravity.TOP
-                y = 100
-            }
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP
+            y = 100
+        }
+        return try {
             windowManager?.addView(view, params)
+            panel = view
+            true
+        } catch (e: Exception) {
+            panel = null
+            false
+        }
+    }
+
+    // به کاشی خبر می‌دهد وضعیتش را دوباره از OverlayService.running بخواند.
+    private fun refreshTile() {
+        try {
+            TileService.requestListeningState(this, ComponentName(this, KingTileService::class.java))
+        } catch (_: Exception) {
         }
     }
 
     override fun onDestroy() {
+        running = false
         panel?.let { try { windowManager?.removeView(it) } catch (_: Exception) {} }
         panel = null
+        refreshTile()
         super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    companion object {
+        /** true فقط وقتی پنل واقعاً روی صفحه است. */
+        @Volatile
+        var running: Boolean = false
+            private set
+    }
 }
