@@ -19,7 +19,11 @@ import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 
-private class TileSpec(val icon: KIcon, val title: String, val command: String?)
+private class TileSpec(
+    val icon: KIcon,
+    val title: String,
+    val command: String?
+)
 
 class MainActivity : ComponentActivity() {
 
@@ -35,12 +39,10 @@ class MainActivity : ComponentActivity() {
     private lateinit var saveFileButton: NeonButton
 
     private var pendingFileContent: String? = null
-
     private var torchTile: QuickTile? = null
     private var built = false
     private var aiBusy = false
 
-    // انتخاب محل ذخیره فایل
     private val createFileLauncher = registerForActivityResult(
         ActivityResultContracts.CreateDocument("text/plain")
     ) { uri ->
@@ -54,11 +56,10 @@ class MainActivity : ComponentActivity() {
             } else {
                 val saved = FileSaver.save(this, uri, content)
 
-                if (saved) {
-                    toast("فایل با موفقیت ذخیره شد.")
-                } else {
-                    toast("ذخیره فایل ناموفق بود.")
-                }
+                toast(
+                    if (saved) "فایل با موفقیت ذخیره شد."
+                    else "ذخیره فایل ناموفق بود."
+                )
             }
         }
     }
@@ -68,6 +69,7 @@ class MainActivity : ComponentActivity() {
     ) { res ->
         if (res.resultCode == Activity.RESULT_OK) {
             val spoken = VoiceInput.extract(res.data)
+
             if (spoken.isNullOrBlank()) {
                 toast("چیزی تشخیص داده نشد؛ دوباره تلاش کن.")
             } else {
@@ -79,7 +81,7 @@ class MainActivity : ComponentActivity() {
 
     private val tick = object : Runnable {
         override fun run() {
-            updateClock()
+            if (built) updateClock()
             handler.postDelayed(this, 15_000L)
         }
     }
@@ -104,9 +106,11 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         if (!built) return
+
         refreshStatus()
         refreshHistory()
         refreshTorchTile()
+
         handler.removeCallbacks(tick)
         tick.run()
     }
@@ -121,8 +125,6 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    // ------------------------------------------------ UI
-
     private fun hRow(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -132,17 +134,20 @@ class MainActivity : ComponentActivity() {
     private fun buildScreen(): android.view.View {
         val (root, content) = neonScreen(this)
 
+        // سربرگ
         val header = LinearLayout(this)
         header.orientation = LinearLayout.HORIZONTAL
         header.gravity = Gravity.CENTER_VERTICAL
 
         val crown = CrownView(this)
         header.addView(crown, LinearLayout.LayoutParams(dp(74), dp(68)))
+
         crown.cameraDistance = resources.displayMetrics.density * 9000f
         crown.alpha = 0f
         crown.rotationY = -90f
         crown.scaleX = 0.4f
         crown.scaleY = 0.4f
+
         crown.animate()
             .alpha(1f)
             .rotationY(0f)
@@ -158,6 +163,7 @@ class MainActivity : ComponentActivity() {
         val title = label(this, "KING AI", 28f, Neon.GREEN, true)
         title.letterSpacing = 0.1f
         title.setShadowLayer(dp(12).toFloat(), 0f, 0f, Neon.GREEN)
+
         titles.addView(title)
         titles.addView(label(this, "دستیار هوشمند اندرویدی", 13f, Neon.TEXT_DIM))
 
@@ -172,12 +178,14 @@ class MainActivity : ComponentActivity() {
         histBtn.setOnClickListener {
             startActivity(Intent(this, HistoryActivity::class.java))
         }
+
         header.addView(histBtn, LinearLayout.LayoutParams(dp(44), dp(44)))
 
         val setBtn = GlassIconButton(this, KIcon.SETTINGS, false, "تنظیمات")
         setBtn.setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
+
         header.addView(
             setBtn,
             LinearLayout.LayoutParams(dp(44), dp(44)).apply {
@@ -197,6 +205,7 @@ class MainActivity : ComponentActivity() {
         clockRow.addView(timeView)
 
         dateView = label(this, "", 14f, Neon.GREEN_SOFT, true)
+
         clockRow.addView(
             dateView,
             LinearLayout.LayoutParams(0, WRAP, 1f).apply {
@@ -208,14 +217,14 @@ class MainActivity : ComponentActivity() {
         content.addView(clockCard, vlp(18))
         clockCard.enter(150)
 
-        // وضعیت KING AI
+        // وضعیت
         val statusCard = neonCard(this)
         statusCard.addView(label(this, "وضعیت KING AI", 16f, Neon.GREEN, true))
 
         statusHost = LinearLayout(this)
         statusHost.orientation = LinearLayout.VERTICAL
-        statusCard.addView(statusHost, vlp(0))
 
+        statusCard.addView(statusHost, vlp(0))
         content.addView(statusCard, vlp(14))
         statusCard.enter(260)
 
@@ -242,6 +251,7 @@ class MainActivity : ComponentActivity() {
 
         val mic = GlassIconButton(this, KIcon.MIC, false, "فرمان صوتی")
         mic.setOnClickListener { startVoice() }
+
         row.addView(
             mic,
             LinearLayout.LayoutParams(dp(48), dp(48)).apply {
@@ -251,6 +261,7 @@ class MainActivity : ComponentActivity() {
 
         val send = GlassIconButton(this, KIcon.SEND, true, "ارسال فرمان")
         send.setOnClickListener { submit() }
+
         row.addView(
             send,
             LinearLayout.LayoutParams(dp(48), dp(48)).apply {
@@ -269,13 +280,7 @@ class MainActivity : ComponentActivity() {
 
         cmdCard.addView(resultView, vlp(12))
 
-        // دکمه ذخیره پاسخ هوش مصنوعی
-        saveFileButton = NeonButton(
-            this,
-            "ذخیره پاسخ در فایل",
-            true
-        )
-
+        saveFileButton = NeonButton(this, "ذخیره پاسخ در فایل", true)
         saveFileButton.isEnabled = false
 
         saveFileButton.setOnClickListener {
@@ -287,7 +292,6 @@ class MainActivity : ComponentActivity() {
         }
 
         cmdCard.addView(saveFileButton, vlp(12))
-
         content.addView(cmdCard, vlp(14))
         cmdCard.enter(370)
 
@@ -311,11 +315,10 @@ class MainActivity : ComponentActivity() {
             val tile = QuickTile(this, spec.icon, spec.title)
 
             tile.setOnClickListener {
-                val cmd = spec.command
-                if (cmd == null) {
+                if (spec.command == null) {
                     startActivity(Intent(this, HistoryActivity::class.java))
                 } else {
-                    execute(cmd)
+                    execute(spec.command)
                 }
             }
 
@@ -331,15 +334,53 @@ class MainActivity : ComponentActivity() {
 
         quickCard.addView(row1, vlp(12))
         quickCard.addView(row2, vlp(10))
+
         content.addView(quickCard, vlp(14))
         quickCard.enter(480)
 
-        // آخرین فرمان‌ها
+        // سرگرمی و بازی
+        val funCard = neonCard(this)
+        funCard.addView(
+            label(this, "سرگرمی", 18f, Neon.GREEN, true)
+        )
+
+        funCard.addView(
+            label(
+                this,
+                "بازی آفلاین KING RUN",
+                14f,
+                Neon.TEXT_DIM
+            ),
+            vlp(8)
+        )
+
+        val gameButton = NeonButton(
+            this,
+            "▶  شروع بازی KING RUN",
+            true
+        )
+
+        gameButton.setOnClickListener {
+            try {
+                startActivity(
+                    Intent(this, KingRunActivity::class.java)
+                )
+            } catch (_: Exception) {
+                toast("باز کردن بازی ناموفق بود.")
+            }
+        }
+
+        funCard.addView(gameButton, vlp(12))
+        content.addView(funCard, vlp(14))
+        funCard.enter(540)
+
+        // تاریخچه
         val histCard = neonCard(this)
         histCard.addView(label(this, "آخرین فرمان‌ها", 16f, Neon.GREEN, true))
 
         historyHost = LinearLayout(this)
         historyHost.orientation = LinearLayout.VERTICAL
+
         histCard.addView(historyHost, vlp(8))
 
         val allBtn = NeonButton(this, "نمایش همه و پاک‌کردن", true)
@@ -357,12 +398,13 @@ class MainActivity : ComponentActivity() {
 
         val startBtn = NeonButton(this, "فعال‌سازی پنجره شناور")
         startBtn.setOnClickListener { startPanel() }
+
         actions.addView(startBtn, vlp(12))
 
         val stopBtn = NeonButton(this, "بستن پنل شناور", true)
         stopBtn.setOnClickListener { stopPanel() }
-        actions.addView(stopBtn, vlp(14))
 
+        actions.addView(stopBtn, vlp(14))
         content.addView(actions, vlp(14))
         actions.enter(700)
 
@@ -378,8 +420,6 @@ class MainActivity : ComponentActivity() {
 
         return root
     }
-
-    // ------------------------------------------------ وضعیت
 
     private fun statusRow(
         title: String,
@@ -464,8 +504,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // ------------------------------------------------ تاریخچه
-
     private fun refreshHistory() {
         historyHost.removeAllViews()
 
@@ -512,8 +550,6 @@ class MainActivity : ComponentActivity() {
         dateView.text = persianDate(now, true)
     }
 
-    // ------------------------------------------------ فرمان‌ها
-
     private fun submit() {
         if (aiBusy) {
             toast("هوش مصنوعی هنوز در حال پاسخ‌گویی است.")
@@ -540,11 +576,11 @@ class MainActivity : ComponentActivity() {
     private fun execute(text: String) {
         val res = router.handle(text)
 
-        // فرمان‌های شناخته‌شده مثل دوربین و چراغ‌قوه آفلاین اجرا می‌شوند.
         if (res.success || !isUnknownCommand(res.message)) {
             resultView.setTextColor(
                 if (res.success) Neon.GREEN_SOFT else Neon.AMBER
             )
+
             resultView.text = res.message
 
             HistoryStore.add(this, text, res.message)
@@ -554,10 +590,10 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        // فرمان ناشناخته به هوش مصنوعی فرستاده می‌شود.
         if (!isApiConfigured()) {
             resultView.setTextColor(Neon.AMBER)
-            resultView.text = "مغز هوشمند تنظیم نشده است. تنظیمات API را بررسی کن."
+            resultView.text =
+                "مغز هوشمند تنظیم نشده است. تنظیمات API را بررسی کن."
             return
         }
 
@@ -568,8 +604,6 @@ class MainActivity : ComponentActivity() {
         if (aiBusy) return
 
         aiBusy = true
-
-        // پاسخ قبلی تا زمان دریافت پاسخ جدید قابل ذخیره نیست.
         pendingFileContent = null
         saveFileButton.isEnabled = false
 
@@ -589,12 +623,8 @@ class MainActivity : ComponentActivity() {
 
             resultView.text = response.message
 
-            // فقط پاسخ موفق برای ذخیره آماده می‌شود.
-            pendingFileContent = if (response.success) {
-                response.message
-            } else {
-                null
-            }
+            pendingFileContent =
+                if (response.success) response.message else null
 
             saveFileButton.isEnabled = response.success
 
@@ -612,12 +642,10 @@ class MainActivity : ComponentActivity() {
     private fun startVoice() {
         try {
             voiceLauncher.launch(VoiceInput.createIntent())
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             toast("سرویس تشخیص گفتار روی این گوشی در دسترس نیست.")
         }
     }
-
-    // ------------------------------------------------ پنل شناور
 
     private fun startPanel() {
         if (!Settings.canDrawOverlays(this)) {
@@ -631,6 +659,7 @@ class MainActivity : ComponentActivity() {
         )
 
         toast("پنل KING AI باز شد.")
+
         handler.postDelayed({
             if (built) refreshStatus()
         }, 700L)
