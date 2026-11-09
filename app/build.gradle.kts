@@ -11,25 +11,16 @@ android {
         applicationId = "com.kingai.assistant"
         minSdk = 26
         targetSdk = 33
-
-        versionCode = (project.findProperty("kingVersionCode") as String?)?.toIntOrNull() ?: 1
-        versionName = "0.1"
+        versionCode = 1
+        versionName = "1.0"
     }
 
-    signingConfigs {
-        getByName("debug") {
-            val ks = file("debug.keystore")
-            if (ks.exists()) {
-                val pass = System.getenv("KING_KEYSTORE_PASSWORD")
-                    ?.takeIf { it.isNotBlank() } ?: "android"
-                val alias = System.getenv("KING_KEY_ALIAS")
-                    ?.takeIf { it.isNotBlank() } ?: "androiddebugkey"
-
-                storeFile = ks
-                storePassword = pass
-                keyAlias = alias
-                keyPassword = pass
-            }
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+        }
+        debug {
+            isMinifyEnabled = false
         }
     }
 
@@ -44,8 +35,11 @@ android {
 }
 
 dependencies {
-    // سیستم دوربین
+    implementation("androidx.activity:activity:1.10.1")
+
     implementation("androidx.camera:camera-camera2:1.4.2")
     implementation("androidx.camera:camera-lifecycle:1.4.2")
     implementation("androidx.camera:camera-view:1.4.2")
+
+    implementation("androidx.core:core-ktx:1.15.0")
 }
