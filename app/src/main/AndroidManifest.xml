@@ -1,6 +1,8 @@
+
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- مجوزهای دوربین -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
@@ -9,9 +11,24 @@
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />
+
+    <!-- مجوزهای پنل شناور و اعلان -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- دسترسی به فهرست برنامه‌ها و تشخیص گفتار -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+    </queries>
 
     <application
         android:allowBackup="false"
@@ -22,20 +39,35 @@
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:usesCleartextTraffic="false">
 
+        <!-- صفحه اصلی -->
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
+        <!-- تنظیمات -->
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false" />
+
+        <!-- تاریخچه -->
+        <activity
+            android:name=".HistoryActivity"
+            android:exported="false" />
+
+        <!-- دوربین -->
         <activity
             android:name=".CameraCaptureActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
 
+        <!-- راه‌اندازی پنل -->
         <activity
             android:name=".LaunchPanelActivity"
             android:exported="false"
@@ -44,17 +76,20 @@
             android:taskAffinity=""
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
+        <!-- کاشی پنل اعلان‌ها -->
         <service
             android:name=".KingTileService"
             android:label="KING AI"
             android:icon="@drawable/ic_king_ai"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
             android:exported="true">
+
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
         </service>
 
+        <!-- سرویس پنل شناور -->
         <service
             android:name=".OverlayService"
             android:exported="false"
@@ -62,4 +97,5 @@
             android:foregroundServiceType="dataSync" />
 
     </application>
+
 </manifest>
