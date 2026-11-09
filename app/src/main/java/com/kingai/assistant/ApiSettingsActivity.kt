@@ -22,20 +22,20 @@ class ApiSettingsActivity : Activity() {
     private lateinit var testButton: Button
 
     private val green = Color.rgb(0, 255, 100)
-    private val background = Color.rgb(10, 15, 20)
+    private val pageBackground = Color.rgb(10, 15, 20)
     private val white = Color.WHITE
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         title = "تنظیمات API"
-        window.statusBarColor = background
-        window.navigationBarColor = background
+        window.statusBarColor = pageBackground
+        window.navigationBarColor = pageBackground
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(20, 25, 20, 25)
-            setBackgroundColor(background)
+            setBackgroundColor(pageBackground)
         }
 
         val scroll = ScrollView(this)
@@ -58,9 +58,7 @@ class ApiSettingsActivity : Activity() {
 
         root.addView(label("آدرس سرویس (Base URL)"))
 
-        baseUrlInput = editText(
-            "مثال: https://api.example.com"
-        )
+        baseUrlInput = editText("مثال: https://api.example.com")
         baseUrlInput.setText(ApiConfig.getBaseUrl(this))
         root.addView(baseUrlInput)
 
@@ -75,7 +73,7 @@ class ApiSettingsActivity : Activity() {
         tokenInput = editText("کلید API را وارد کن")
         tokenInput.inputType =
             android.text.InputType.TYPE_CLASS_TEXT or
-            android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+                android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
 
         root.addView(tokenInput)
 
@@ -120,6 +118,11 @@ class ApiSettingsActivity : Activity() {
             modelInput.setText("")
             tokenInput.setText("")
             statusText.text = "تنظیمات API پاک شد."
+            Toast.makeText(
+                this,
+                "تنظیمات پاک شد",
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -140,6 +143,7 @@ class ApiSettingsActivity : Activity() {
             setHintTextColor(Color.GRAY)
             setSingleLine(true)
             setPadding(15, 10, 15, 10)
+
             backgroundTintList =
                 android.content.res.ColorStateList.valueOf(green)
         }
@@ -186,6 +190,7 @@ class ApiSettingsActivity : Activity() {
                 statusText.text = "ذخیره امن توکن ناموفق بود."
                 return false
             }
+
             tokenInput.setText("")
         } else if (!ApiConfig.hasToken(this)) {
             statusText.text = "کلید API را وارد کن."
@@ -193,7 +198,13 @@ class ApiSettingsActivity : Activity() {
         }
 
         statusText.text = "تنظیمات ذخیره شد."
-        Toast.makeText(this, "ذخیره شد", Toast.LENGTH_SHORT).show()
+
+        Toast.makeText(
+            this,
+            "ذخیره شد",
+            Toast.LENGTH_SHORT
+        ).show()
+
         return true
     }
 
