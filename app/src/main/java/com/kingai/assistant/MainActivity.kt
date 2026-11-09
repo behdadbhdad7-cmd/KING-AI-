@@ -402,8 +402,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun hasTelegramNotificationAccess(): Boolean {
-        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        return manager.enabledNotificationListenerPackages.contains(packageName)
+    val enabled = Settings.Secure.getString(
+        contentResolver,
+        "enabled_notification_listeners"
+    ) ?: return false
+
+    return enabled.contains(packageName)
     }
 
     private fun statusRow(
