@@ -1,9 +1,9 @@
-
 package com.kingai.assistant
 
 import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -337,6 +337,45 @@ class MainActivity : ComponentActivity() {
 
         content.addView(quickCard, vlp(14))
         quickCard.enter(480)
+
+        // مرکز امنیت
+        val securityCard = neonCard(this)
+
+        securityCard.addView(
+            label(this, "🛡 مرکز امنیت", 18f, Neon.GREEN, true)
+        )
+
+        securityCard.addView(
+            label(
+                this,
+                "مدیریت مجوزها و دسترسی‌های KING AI",
+                13f,
+                Neon.TEXT_DIM
+            ),
+            vlp(8)
+        )
+
+        val securityButton = NeonButton(
+            this,
+            "باز کردن تنظیمات امنیتی",
+            true
+        )
+
+        securityButton.setOnClickListener {
+            try {
+                val intent = Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.fromParts("package", packageName, null)
+                )
+                startActivity(intent)
+            } catch (_: Exception) {
+                toast("باز کردن تنظیمات ناموفق بود.")
+            }
+        }
+
+        securityCard.addView(securityButton, vlp(12))
+        content.addView(securityCard, vlp(14))
+        securityCard.enter(520)
 
         // سرگرمی و بازی
         val funCard = neonCard(this)
