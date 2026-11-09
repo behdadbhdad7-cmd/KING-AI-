@@ -76,6 +76,20 @@
             android:exported="false"
             android:screenOrientation="portrait" />
 
+        <activity
+            android:name=".TelegramInboxActivity"
+            android:exported="false" />
+
+        <service
+            android:name=".TelegramNotificationListener"
+            android:label="KING AI Telegram Monitor"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
         <service
             android:name=".KingTileService"
             android:label="KING AI"
