@@ -1,3 +1,4 @@
+
 package com.kingai.assistant
 
 import android.app.Activity
@@ -31,10 +32,11 @@ class MainActivity : ComponentActivity() {
     private lateinit var dateView: TextView
     private lateinit var statusHost: LinearLayout
     private lateinit var historyHost: LinearLayout
+
     private var torchTile: QuickTile? = null
     private var built = false
+    private var aiBusy = false
 
-    // ورودی صوتی: پنجره‌ی رسمی تشخیص گفتار اندروید (Activity Result API)
     private val voiceLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { res ->
@@ -59,11 +61,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         applyNeonWindow()
+
         try {
             setContentView(buildScreen())
             built = true
         } catch (e: Exception) {
-            // اگر ساخت صفحه خطا بدهد، به‌جای صفحه سفید، متن خطا نشان داده می‌شود.
             val tv = TextView(this)
             tv.setBackgroundColor(Neon.BLACK)
             tv.setTextColor(Neon.GREEN)
@@ -93,18 +95,17 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    // ---------------------------------------------------------------- UI
+    // ------------------------------------------------ UI
 
     private fun hRow(): LinearLayout {
-        val row = LinearLayout(this)
-        row.orientation = LinearLayout.HORIZONTAL
-        return row
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
     }
 
     private fun buildScreen(): android.view.View {
         val (root, content) = neonScreen(this)
 
-        // ----- سربرگ: تاج + عنوان + تاریخچه + تنظیمات
         val header = LinearLayout(this)
         header.orientation = LinearLayout.HORIZONTAL
         header.gravity = Gravity.CENTER_VERTICAL
@@ -127,60 +128,81 @@ class MainActivity : ComponentActivity() {
 
         val titles = LinearLayout(this)
         titles.orientation = LinearLayout.VERTICAL
+
         val title = label(this, "KING AI", 28f, Neon.GREEN, true)
         title.letterSpacing = 0.1f
         title.setShadowLayer(dp(12).toFloat(), 0f, 0f, Neon.GREEN)
         titles.addView(title)
         titles.addView(label(this, "دستیار هوشمند اندرویدی", 13f, Neon.TEXT_DIM))
+
         header.addView(
             titles,
-            LinearLayout.LayoutParams(0, WRAP, 1f).apply { marginStart = dp(10) }
+            LinearLayout.LayoutParams(0, WRAP, 1f).apply {
+                marginStart = dp(10)
+            }
         )
 
         val histBtn = GlassIconButton(this, KIcon.HISTORY, false, "تاریخچه")
-        histBtn.setOnClickListener { startActivity(Intent(this, HistoryActivity::class.java)) }
+        histBtn.setOnClickListener {
+            startActivity(Intent(this, HistoryActivity::class.java))
+        }
         header.addView(histBtn, LinearLayout.LayoutParams(dp(44), dp(44)))
 
         val setBtn = GlassIconButton(this, KIcon.SETTINGS, false, "تنظیمات")
-        setBtn.setOnClickListener { startActivity(Intent(this, SettingsActivity::class.java)) }
+        setBtn.setOnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
         header.addView(
             setBtn,
-            LinearLayout.LayoutParams(dp(44), dp(44)).apply { marginStart = dp(8) }
+            LinearLayout.LayoutParams(dp(44), dp(44)).apply {
+                marginStart = dp(8)
+            }
         )
+
         content.addView(header, vlp(0))
 
-        // ----- ساعت و تاریخ
+        // ساعت و تاریخ
         val clockCard = neonCard(this)
         val clockRow = hRow()
         clockRow.gravity = Gravity.CENTER_VERTICAL
+
         timeView = label(this, "", 36f, Color.WHITE, true)
         timeView.setShadowLayer(dp(10).toFloat(), 0f, 0f, Neon.GREEN)
         clockRow.addView(timeView)
+
         dateView = label(this, "", 14f, Neon.GREEN_SOFT, true)
         clockRow.addView(
             dateView,
-            LinearLayout.LayoutParams(0, WRAP, 1f).apply { marginStart = dp(16) }
+            LinearLayout.LayoutParams(0, WRAP, 1f).apply {
+                marginStart = dp(16)
+            }
         )
+
         clockCard.addView(clockRow)
         content.addView(clockCard, vlp(18))
         clockCard.enter(150)
 
-        // ----- وضعیت KING AI
+        // وضعیت KING AI
         val statusCard = neonCard(this)
         statusCard.addView(label(this, "وضعیت KING AI", 16f, Neon.GREEN, true))
+
         statusHost = LinearLayout(this)
         statusHost.orientation = LinearLayout.VERTICAL
         statusCard.addView(statusHost, vlp(0))
+
         content.addView(statusCard, vlp(14))
         statusCard.enter(260)
 
-        // ----- فرمان
+        // فرمان
         val cmdCard = neonCard(this)
         cmdCard.addView(label(this, "فرمان بده", 16f, Neon.GREEN, true))
+
         val row = hRow()
         row.gravity = Gravity.CENTER_VERTICAL
+
         input = neonInput(this, "مثلاً: شات بگیر")
         input.imeOptions = EditorInfo.IME_ACTION_SEND
+
         input.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEND) {
                 submit()
@@ -189,46 +211,59 @@ class MainActivity : ComponentActivity() {
                 false
             }
         }
+
         row.addView(input, LinearLayout.LayoutParams(0, WRAP, 1f))
 
         val mic = GlassIconButton(this, KIcon.MIC, false, "فرمان صوتی")
         mic.setOnClickListener { startVoice() }
         row.addView(
             mic,
-            LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginStart = dp(8) }
+            LinearLayout.LayoutParams(dp(48), dp(48)).apply {
+                marginStart = dp(8)
+            }
         )
+
         val send = GlassIconButton(this, KIcon.SEND, true, "ارسال فرمان")
         send.setOnClickListener { submit() }
         row.addView(
             send,
-            LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginStart = dp(8) }
+            LinearLayout.LayoutParams(dp(48), dp(48)).apply {
+                marginStart = dp(8)
+            }
         )
+
         cmdCard.addView(row, vlp(12))
 
         resultView = label(
             this,
             "آماده‌ی دریافت فرمان. «راهنما» را بنویس تا فرمان‌ها را ببینی.",
-            14f, Neon.TEXT_DIM
+            14f,
+            Neon.TEXT_DIM
         )
+
         cmdCard.addView(resultView, vlp(12))
         content.addView(cmdCard, vlp(14))
         cmdCard.enter(370)
 
-        // ----- دسترسی سریع
+        // دسترسی سریع
         val quickCard = neonCard(this)
         quickCard.addView(label(this, "دسترسی سریع", 16f, Neon.GREEN, true))
+
         val specs = listOf(
-            TileSpec(KIcon.TORCH, "چراغ\u200cقوه", "چراغ قوه"),
+            TileSpec(KIcon.TORCH, "چراغ‌قوه", "چراغ قوه"),
             TileSpec(KIcon.CAMERA, "شات بگیر", "شات بگیر"),
             TileSpec(KIcon.GALLERY, "گالری", "گالری"),
             TileSpec(KIcon.WIFI, "Wi-Fi", "وای فای"),
             TileSpec(KIcon.BLUETOOTH, "Bluetooth", "بلوتوث"),
             TileSpec(KIcon.HISTORY, "تاریخچه", null)
         )
+
         val row1 = hRow()
         val row2 = hRow()
+
         for ((i, spec) in specs.withIndex()) {
             val tile = QuickTile(this, spec.icon, spec.title)
+
             tile.setOnClickListener {
                 val cmd = spec.command
                 if (cmd == null) {
@@ -237,88 +272,145 @@ class MainActivity : ComponentActivity() {
                     execute(cmd)
                 }
             }
+
             if (spec.icon == KIcon.TORCH) torchTile = tile
+
             val lp = LinearLayout.LayoutParams(0, WRAP, 1f)
             lp.marginStart = dp(5)
             lp.marginEnd = dp(5)
-            if (i < 3) row1.addView(tile, lp) else row2.addView(tile, lp)
+
+            if (i < 3) row1.addView(tile, lp)
+            else row2.addView(tile, lp)
         }
+
         quickCard.addView(row1, vlp(12))
         quickCard.addView(row2, vlp(10))
         content.addView(quickCard, vlp(14))
         quickCard.enter(480)
 
-        // ----- آخرین فرمان‌ها
+        // آخرین فرمان‌ها
         val histCard = neonCard(this)
         histCard.addView(label(this, "آخرین فرمان‌ها", 16f, Neon.GREEN, true))
+
         historyHost = LinearLayout(this)
         historyHost.orientation = LinearLayout.VERTICAL
         histCard.addView(historyHost, vlp(8))
+
         val allBtn = NeonButton(this, "نمایش همه و پاک‌کردن", true)
-        allBtn.setOnClickListener { startActivity(Intent(this, HistoryActivity::class.java)) }
+        allBtn.setOnClickListener {
+            startActivity(Intent(this, HistoryActivity::class.java))
+        }
+
         histCard.addView(allBtn, vlp(14))
         content.addView(histCard, vlp(14))
         histCard.enter(590)
 
-        // ----- پنل شناور (قابلیت قبلی)
+        // پنل شناور
         val actions = neonCard(this)
         actions.addView(label(this, "کنترل پنل شناور", 16f, Neon.GREEN, true))
+
         val startBtn = NeonButton(this, "فعال‌سازی پنجره شناور")
         startBtn.setOnClickListener { startPanel() }
         actions.addView(startBtn, vlp(12))
+
         val stopBtn = NeonButton(this, "بستن پنل شناور", true)
         stopBtn.setOnClickListener { stopPanel() }
         actions.addView(stopBtn, vlp(14))
+
         content.addView(actions, vlp(14))
         actions.enter(700)
 
         val footer = label(
             this,
             "بعد از فعال‌سازی، کاشی KING AI را از پنل اعلان‌ها بزن تا پنل روی برنامه‌ی باز ظاهر شود. مجوزها و کاشی در «تنظیمات» هستند.",
-            12f, Neon.TEXT_DIM
+            12f,
+            Neon.TEXT_DIM
         )
+
         footer.textAlignment = android.view.View.TEXT_ALIGNMENT_CENTER
         content.addView(footer, vlp(18))
 
         return root
     }
 
-    // ------------------------------------------------------------ Refresh
+    // ------------------------------------------------ وضعیت
 
-    private fun statusRow(title: String, chipText: String, kind: ChipKind): LinearLayout {
+    private fun statusRow(
+        title: String,
+        chipText: String,
+        kind: ChipKind
+    ): LinearLayout {
         val row = hRow()
         row.gravity = Gravity.CENTER_VERTICAL
+
         row.addView(
             label(this, title, 14f, Color.WHITE),
             LinearLayout.LayoutParams(0, WRAP, 1f)
         )
+
         row.addView(chip(this, chipText, kind))
         return row
     }
 
+    private fun isApiConfigured(): Boolean {
+        return ApiConfig.hasToken(this) &&
+            ApiConfig.getBaseUrl(this).isNotBlank() &&
+            ApiConfig.getModel(this).isNotBlank()
+    }
+
     private fun refreshStatus() {
         statusHost.removeAllViews()
+
         val overlayOk = Settings.canDrawOverlays(this)
         val panelOpen = OverlayService.running
+        val aiReady = isApiConfigured()
 
-        statusHost.addView(statusRow("فرمان‌های محلی (آفلاین)", "فعال", ChipKind.ON), vlp(12))
-        statusHost.addView(statusRow("مغز هوشمند (API)", "غیرفعال", ChipKind.OFF), vlp(10))
         statusHost.addView(
-            statusRow("پنل شناور", if (panelOpen) "باز" else "بسته", if (panelOpen) ChipKind.ON else ChipKind.INFO),
+            statusRow("فرمان‌های محلی (آفلاین)", "فعال", ChipKind.ON),
+            vlp(12)
+        )
+
+        statusHost.addView(
+            statusRow(
+                "مغز هوشمند (API)",
+                if (aiReady) "آماده" else "غیرفعال",
+                if (aiReady) ChipKind.ON else ChipKind.OFF
+            ),
             vlp(10)
         )
+
         statusHost.addView(
-            statusRow("نمایش روی سایر برنامه‌ها", if (overlayOk) "فعال" else "غیرفعال", if (overlayOk) ChipKind.ON else ChipKind.OFF),
+            statusRow(
+                "پنل شناور",
+                if (panelOpen) "باز" else "بسته",
+                if (panelOpen) ChipKind.ON else ChipKind.INFO
+            ),
             vlp(10)
         )
+
+        statusHost.addView(
+            statusRow(
+                "نمایش روی سایر برنامه‌ها",
+                if (overlayOk) "فعال" else "غیرفعال",
+                if (overlayOk) ChipKind.ON else ChipKind.OFF
+            ),
+            vlp(10)
+        )
+
         statusHost.addView(
             label(
                 this,
-                "مغز هوشمند هنوز به هیچ API وصل نیست و در مرحله‌ی بعد با کلید خودت فعال می‌شود.",
-                12f, Neon.TEXT_DIM
+                if (aiReady) {
+                    "اتصال API تنظیم شده است. سؤال‌ها به مغز هوشمند ارسال می‌شوند."
+                } else {
+                    "برای فعال‌سازی مغز هوشمند، تنظیمات API را کامل کن."
+                },
+                12f,
+                Neon.TEXT_DIM
             ),
             vlp(12)
         )
+
         if (!overlayOk) {
             val b = NeonButton(this, "فعال‌سازی مجوز ضروری", true)
             b.setOnClickListener { openOverlaySettings() }
@@ -326,26 +418,35 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // ------------------------------------------------ تاریخچه
+
     private fun refreshHistory() {
         historyHost.removeAllViews()
+
         val entries = HistoryStore.list(this).take(3)
+
         if (entries.isEmpty()) {
             val msg = if (Prefs.historyEnabled(this)) {
                 "هنوز فرمانی اجرا نشده است."
             } else {
                 "ذخیره‌ی تاریخچه در تنظیمات خاموش است."
             }
+
             historyHost.addView(label(this, msg, 13f, Neon.TEXT_DIM))
             return
         }
+
         for ((i, e) in entries.withIndex()) {
             val cmd = label(this, e.command, 14f, Color.WHITE, true)
             cmd.maxLines = 1
             cmd.ellipsize = TextUtils.TruncateAt.END
+
             historyHost.addView(cmd, vlp(if (i == 0) 0 else 10))
+
             val res = label(this, e.result, 12f, Neon.TEXT_DIM)
             res.maxLines = 2
             res.ellipsize = TextUtils.TruncateAt.END
+
             historyHost.addView(res, vlp(2))
         }
     }
@@ -353,7 +454,10 @@ class MainActivity : ComponentActivity() {
     private fun refreshTorchTile() {
         val tile = torchTile ?: return
         tile.setActive(TorchController.isOn)
-        tile.setTitle(if (TorchController.isOn) "چراغ\u200cقوه روشن" else "چراغ\u200cقوه")
+        tile.setTitle(
+            if (TorchController.isOn) "چراغ‌قوه روشن"
+            else "چراغ‌قوه"
+        )
     }
 
     private fun updateClock() {
@@ -362,27 +466,82 @@ class MainActivity : ComponentActivity() {
         dateView.text = persianDate(now, true)
     }
 
-    // ------------------------------------------------------------ Actions
+    // ------------------------------------------------ فرمان‌ها
 
     private fun submit() {
+        if (aiBusy) {
+            toast("هوش مصنوعی هنوز در حال پاسخ‌گویی است.")
+            return
+        }
+
         val text = input.text.toString().trim()
+
         if (text.isEmpty()) {
             resultView.setTextColor(Neon.AMBER)
             resultView.text = "اول یک فرمان بنویس."
             return
         }
+
         execute(text)
         input.setText("")
     }
 
+    private fun isUnknownCommand(message: String): Boolean {
+        return message.startsWith("فرمان «") &&
+            message.contains("را نمی‌شناسم")
+    }
+
     private fun execute(text: String) {
         val res = router.handle(text)
-        resultView.setTextColor(if (res.success) Neon.GREEN_SOFT else Neon.AMBER)
-        resultView.text = res.message
-        HistoryStore.add(this, text, res.message)
+
+        // فرمان‌های شناخته‌شده مثل دوربین و چراغ‌قوه آفلاین اجرا می‌شوند.
+        if (res.success || !isUnknownCommand(res.message)) {
+            resultView.setTextColor(
+                if (res.success) Neon.GREEN_SOFT else Neon.AMBER
+            )
+            resultView.text = res.message
+
+            HistoryStore.add(this, text, res.message)
+            refreshHistory()
+            refreshTorchTile()
+            hideKeyboard()
+            return
+        }
+
+        // فرمان ناشناخته به هوش مصنوعی فرستاده می‌شود.
+        if (!isApiConfigured()) {
+            resultView.setTextColor(Neon.AMBER)
+            resultView.text = "مغز هوشمند تنظیم نشده است. تنظیمات API را بررسی کن."
+            return
+        }
+
+        askAi(text)
+    }
+
+    private fun askAi(question: String) {
+        if (aiBusy) return
+
+        aiBusy = true
+        resultView.setTextColor(Neon.GREEN)
+        resultView.text = "🧠 در حال فکر کردن و دریافت پاسخ..."
+
         hideKeyboard()
-        refreshHistory()
-        refreshTorchTile()
+
+        ApiClient.sendMessage(this, question) { response ->
+            if (isFinishing || isDestroyed) return@sendMessage
+
+            aiBusy = false
+
+            resultView.setTextColor(
+                if (response.success) Neon.GREEN_SOFT else Neon.AMBER
+            )
+
+            resultView.text = response.message
+
+            HistoryStore.add(this, question, response.message)
+            refreshHistory()
+            refreshStatus()
+        }
     }
 
     private fun hideKeyboard() {
@@ -398,20 +557,31 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // ------------------------------------------------ پنل شناور
+
     private fun startPanel() {
         if (!Settings.canDrawOverlays(this)) {
             toast("اول مجوز «نمایش روی سایر برنامه‌ها» را فعال کن.")
             openOverlaySettings()
             return
         }
-        startForegroundService(Intent(this, OverlayService::class.java))
+
+        startForegroundService(
+            Intent(this, OverlayService::class.java)
+        )
+
         toast("پنل KING AI باز شد.")
-        handler.postDelayed({ if (built) refreshStatus() }, 700L)
+        handler.postDelayed({
+            if (built) refreshStatus()
+        }, 700L)
     }
 
     private fun stopPanel() {
         stopService(Intent(this, OverlayService::class.java))
         toast("پنل KING AI بسته شد.")
-        handler.postDelayed({ if (built) refreshStatus() }, 400L)
+
+        handler.postDelayed({
+            if (built) refreshStatus()
+        }, 400L)
     }
 }
