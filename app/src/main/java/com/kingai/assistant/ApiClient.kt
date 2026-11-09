@@ -1,3 +1,4 @@
+
 package com.kingai.assistant
 
 import android.os.Handler
@@ -8,9 +9,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.Executors
 
-/**
- * ارتباط با سرویس‌های هوش مصنوعی سازگار با OpenAI API
- */
 object ApiClient {
 
     data class ApiResult(
@@ -28,7 +26,6 @@ object ApiClient {
     ) {
         executor.execute {
             val result = request(context, message)
-
             mainHandler.post {
                 callback(result)
             }
@@ -40,12 +37,24 @@ object ApiClient {
         message: String
     ): ApiResult {
 
-        val token = ApiConfig.getToken(context)
-        val baseUrl = ApiConfig.getBaseUrl(context)
-        val model = ApiConfig.getModel(context)
+        val rawToken = ApiConfig.getToken(context)
 
-        if (token.isNullOrBlank()) {
+        if (rawToken.isNullOrBlank()) {
             return ApiResult(false, "کلید API تنظیم نشده است.")
+        }
+
+        // حذف فاصله و پیشوند Bearer در صورت کپی اشتباه
+        var token = rawToken.trim()
+
+        if (token.startsWith("Bearer ", ignoreCase = true)) {
+            token = token.substring(7).trim()
+        }
+
+        val baseUrl = ApiConfig.getBaseUrl(context).trim().trimEnd('/')
+        val model = ApiConfig.getModel(context).trim()
+
+        if (token.isBlank()) {
+            return ApiResult(false, "کلید API خالی است.")
         }
 
         if (baseUrl.isBlank() || model.isBlank()) {
@@ -59,9 +68,8 @@ object ApiClient {
         var connection: HttpURLConnection? = null
 
         return try {
-            val endpoint = if (
-                baseUrl.endsWith("/v1", true)
-            ) {
+
+            val endpoint = if (baseUrl.endsWith("/v1", true)) {
                 "$baseUrl/chat/completions"
             } else {
                 "$baseUrl/v1/chat/completions"
@@ -107,9 +115,7 @@ object ApiClient {
             }
 
             connection.outputStream.use { output ->
-                output.write(
-                    body.toString().toByteArray(Charsets.UTF_8)
-                )
+                output.write(body.toString().toByteArray(Charsets.UTF_8))
             }
 
             val status = connection.responseCode
@@ -125,25 +131,28 @@ object ApiClient {
             }
 
             if (status !in 200..299) {
+
                 val detail = try {
-                    JSONObject(responseText)
+                    val error = JSONObject(responseText)
                         .optJSONObject("error")
-                        ?.optString("message")
-                        .orEmpty()
+
+                    error?.optString("message")
+                        ?.takeIf { it.isNotBlank() }
+                        ?: responseText
                 } catch (_: Exception) {
-                    ""
+                    responseText
                 }
 
                 return ApiResult(
                     false,
                     when (status) {
-                        401 -> "کلید API اشتباه یا نامعتبر است."
-                        403 -> "سرویس اجازه دسترسی نداده است."
-                        404 -> "آدرس یا مسیر API پیدا نشد."
-                        429 -> "محدودیت درخواست یا اعتبار سرویس."
-                        in 500..599 -> "سرور هوش مصنوعی خطا داده است."
-                        else -> "خطای HTTP $status: " +
-                            detail.take(250)
+                        400 -> "درخواست نامعتبر است: ${detail.take(300)}"
+                        401 -> "خطای احراز هویت (401): ${detail.take(300)}"
+                        403 -> "دسترسی ممنوع (403): ${detail.take(300)}"
+                        404 -> "مسیر یا مدل پیدا نشد (404): ${detail.take(300)}"
+                        429 -> "محدودیت درخواست یا اعتبار سرویس (429): ${detail.take(300)}"
+                        in 500..599 -> "خطای سرور ($status): ${detail.take(300)}"
+                        else -> "خطای HTTP $status: ${detail.take(300)}"
                     }
                 )
             }
@@ -157,10 +166,7 @@ object ApiClient {
                 )
 
             if (choices.length() == 0) {
-                return ApiResult(
-                    false,
-                    "سرویس پاسخ خالی برگرداند."
-                )
+                return ApiResult(false, "سرویس پاسخ خالی برگرداند.")
             }
 
             val content = choices
@@ -170,6 +176,7 @@ object ApiClient {
 
             val answer = when (content) {
                 is String -> content
+
                 is JSONArray -> {
                     val parts = mutableListOf<String>()
 
@@ -184,6 +191,7 @@ object ApiClient {
 
                     parts.joinToString("\n")
                 }
+
                 else -> ""
             }
 
