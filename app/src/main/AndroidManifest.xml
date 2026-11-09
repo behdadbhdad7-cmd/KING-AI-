@@ -1,16 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- مجوز دوربین -->
     <uses-permission android:name="android.permission.CAMERA" />
-
-    <!-- مجوز پنجره شناور -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-
-    <!-- مجوز سرویس پس‌زمینه -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-
-    <!-- مجوز اعلان‌ها -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
@@ -33,7 +26,11 @@
 
         </activity>
 
-        <!-- صفحه بازکننده پنل -->
+        <activity
+            android:name=".CameraCaptureActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
         <activity
             android:name=".LaunchPanelActivity"
             android:exported="false"
@@ -42,7 +39,6 @@
             android:taskAffinity=""
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
-        <!-- کاشی پنل اعلان‌ها -->
         <service
             android:name=".KingTileService"
             android:label="KING AI"
@@ -56,7 +52,6 @@
 
         </service>
 
-        <!-- پنل شناور -->
         <service
             android:name=".OverlayService"
             android:exported="false"
