@@ -1,6 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- مجوز دوربین -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- مجوز پنجره شناور -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <!-- مجوز سرویس پس‌زمینه -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
+    <!-- مجوز اعلان‌ها -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
@@ -15,13 +25,15 @@
         <activity
             android:name=".MainActivity"
             android:exported="true">
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
         </activity>
 
-        <!-- صفحه‌ی نامرئی و گذرا: بعد از لمس کاشی، پرده‌ی اعلان را می‌بندد، پنل را شروع می‌کند و بسته می‌شود. -->
+        <!-- صفحه بازکننده پنل -->
         <activity
             android:name=".LaunchPanelActivity"
             android:exported="false"
@@ -30,21 +42,26 @@
             android:taskAffinity=""
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
+        <!-- کاشی پنل اعلان‌ها -->
         <service
             android:name=".KingTileService"
             android:label="KING AI"
             android:icon="@drawable/ic_king_ai"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
             android:exported="true">
+
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
+
         </service>
 
+        <!-- پنل شناور -->
         <service
             android:name=".OverlayService"
             android:exported="false"
             android:stopWithTask="false"
             android:foregroundServiceType="dataSync" />
+
     </application>
 </manifest>
