@@ -24,8 +24,13 @@ class OverlayService : Service() {
     private var windowManager: WindowManager? = null
     private var panel: LinearLayout? = null
 
+    private val router by lazy {
+        CommandRouter(this)
+    }
+
     override fun onCreate() {
         super.onCreate()
+
         createNotification()
 
         if (!Settings.canDrawOverlays(this)) {
@@ -34,6 +39,7 @@ class OverlayService : Service() {
                 "ابتدا مجوز پنجره شناور را فعال کن.",
                 Toast.LENGTH_LONG
             ).show()
+
             stopSelf()
             return
         }
@@ -44,6 +50,7 @@ class OverlayService : Service() {
                 "پنل باز نشد.",
                 Toast.LENGTH_LONG
             ).show()
+
             stopSelf()
             return
         }
@@ -63,7 +70,8 @@ class OverlayService : Service() {
 
     private fun createNotification() {
         val channelId = "king_ai_running"
-        val manager = getSystemService(NotificationManager::class.java)
+        val manager =
+            getSystemService(NotificationManager::class.java)
 
         if (Build.VERSION.SDK_INT >= 26) {
             manager.createNotificationChannel(
@@ -75,12 +83,14 @@ class OverlayService : Service() {
             )
         }
 
-        val notification = if (Build.VERSION.SDK_INT >= 26) {
+        val builder = if (Build.VERSION.SDK_INT >= 26) {
             Notification.Builder(this, channelId)
         } else {
             @Suppress("DEPRECATION")
             Notification.Builder(this)
         }
+
+        val notification = builder
             .setContentTitle("KING AI فعال است")
             .setContentText("پنجره شناور آماده است")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
@@ -96,19 +106,14 @@ class OverlayService : Service() {
         val input = EditText(this).apply {
             hint = "مثلاً: شات بگیر"
             textSize = 16f
+            setSingleLine(false)
         }
 
         val status = TextView(this).apply {
             text = "سلام! من KING AI هستم 👑"
             textSize = 15f
             setTextColor(0xFFFFFFFF.toInt())
-        }
-
-        val close = Button(this).apply {
-            text = "بستن"
-            setOnClickListener {
-                stopSelf()
-            }
+            setPadding(0, 12, 0, 12)
         }
 
         val send = Button(this).apply {
@@ -123,6 +128,14 @@ class OverlayService : Service() {
                 }
 
                 handleCommand(command, status)
+            }
+        }
+
+        val close = Button(this).apply {
+            text = "بستن"
+
+            setOnClickListener {
+                stopSelf()
             }
         }
 
@@ -170,44 +183,26 @@ class OverlayService : Service() {
         command: String,
         status: TextView
     ) {
-        val normalized = command
-            .replace("‌", "")
-            .replace(" ", "")
-            .lowercase()
-
-        if (
-            normalized.contains("شاتبگیر") ||
-            normalized.contains("عکس‌بگیر") ||
-            normalized.contains("عکس بگیر") ||
-            normalized == "دوربین"
-        ) {
-            openCamera(status)
-            return
-        }
-
-        status.text =
-            "فرمان دریافت شد: $command\nاین فرمان هنوز به قابلیت مربوطه وصل نشده است."
-    }
-
-    private fun openCamera(status: TextView) {
         try {
-            status.text = "در حال بازکردن دوربین KING AI..."
+            status.text = "در حال اجرای فرمان..."
 
-            val cameraIntent = Intent(
+            val result = router.handle(command)
+
+            status.text = result.message
+
+            HistoryStore.add(
                 this,
-                CameraCaptureActivity::class.java
-            ).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-
-            startActivity(cameraIntent)
+                command,
+                result.message
+            )
 
         } catch (e: Exception) {
-            status.text = "بازکردن دوربین ناموفق بود: ${e.message}"
+            status.text =
+                "خطا در اجرای فرمان: ${e.message}"
 
             Toast.makeText(
                 this,
-                "خطا در بازکردن دوربین",
+                "اجرای فرمان ناموفق بود",
                 Toast.LENGTH_LONG
             ).show()
         }
@@ -217,7 +212,10 @@ class OverlayService : Service() {
         try {
             TileService.requestListeningState(
                 this,
-                ComponentName(this, KingTileService::class.java)
+                ComponentName(
+                    this,
+                    KingTileService::class.java
+                )
             )
         } catch (_: Exception) {
         }
@@ -235,6 +233,7 @@ class OverlayService : Service() {
 
         panel = null
         refreshTile()
+
         super.onDestroy()
     }
 
