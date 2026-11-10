@@ -1,3 +1,4 @@
+
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
@@ -78,6 +79,10 @@
 
         <activity
             android:name=".TelegramInboxActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".MessengerHubActivity"
             android:exported="false" />
 
         <service
