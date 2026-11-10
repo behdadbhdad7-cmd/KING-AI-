@@ -4,6 +4,9 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+val telegramApiId = System.getenv("TELEGRAM_API_ID") ?: ""
+val telegramApiHash = System.getenv("TELEGRAM_API_HASH") ?: ""
+
 android {
     namespace = "com.kingai.assistant"
     compileSdk = 35
@@ -14,6 +17,22 @@ android {
         targetSdk = 33
         versionCode = 1
         versionName = "1.0"
+
+        buildConfigField(
+            "String",
+            "TELEGRAM_API_ID",
+            "\"$telegramApiId\""
+        )
+
+        buildConfigField(
+            "String",
+            "TELEGRAM_API_HASH",
+            "\"$telegramApiHash\""
+        )
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {
@@ -42,7 +61,6 @@ dependencies {
     implementation("androidx.camera:camera-view:1.4.2")
     implementation("androidx.core:core-ktx:1.15.0")
 
-    // Telegram TDLib
     implementation("io.github.tdlib-android:core:0.1.1")
     implementation("io.github.tdlib-android:ktx:0.1.1")
 }
