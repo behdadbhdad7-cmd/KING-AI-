@@ -22,7 +22,6 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
-
         <intent>
             <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
         </intent>
@@ -47,17 +46,9 @@
             </intent-filter>
         </activity>
 
-        <activity
-            android:name=".SettingsActivity"
-            android:exported="false" />
-
-        <activity
-            android:name=".ApiSettingsActivity"
-            android:exported="false" />
-
-        <activity
-            android:name=".HistoryActivity"
-            android:exported="false" />
+        <activity android:name=".SettingsActivity" android:exported="false" />
+        <activity android:name=".ApiSettingsActivity" android:exported="false" />
+        <activity android:name=".HistoryActivity" android:exported="false" />
 
         <activity
             android:name=".CameraCaptureActivity"
@@ -77,13 +68,8 @@
             android:exported="false"
             android:screenOrientation="portrait" />
 
-        <activity
-            android:name=".TelegramInboxActivity"
-            android:exported="false" />
-
-        <activity
-            android:name=".MessengerHubActivity"
-            android:exported="false" />
+        <activity android:name=".TelegramInboxActivity" android:exported="false" />
+        <activity android:name=".MessengerHubActivity" android:exported="false" />
 
         <service
             android:name=".TelegramNotificationListener"
@@ -113,5 +99,4 @@
             android:foregroundServiceType="dataSync" />
 
     </application>
-
 </manifest>
