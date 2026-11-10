@@ -12,6 +12,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,6 +51,8 @@ jobs:
         env:
           KING_KEYSTORE_PASSWORD: ${{ secrets.KING_KEYSTORE_PASSWORD }}
           KING_KEY_ALIAS: ${{ secrets.KING_KEY_ALIAS }}
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
         run: gradle assembleDebug --stacktrace -PkingVersionCode=${{ github.run_number }}
 
       - name: Upload APK
@@ -58,3 +61,4 @@ jobs:
           name: KING-AI-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+          
