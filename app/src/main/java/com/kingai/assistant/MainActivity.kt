@@ -159,14 +159,6 @@ class MainActivity : ComponentActivity() {
         }
         header.addView(histBtn, LinearLayout.LayoutParams(dp(44), dp(44)))
 
-        val messengerBtn = GlassIconButton(this, KIcon.HISTORY, false, "مرکز پیام‌رسان‌ها")
-        messengerBtn.setOnClickListener {
-            startActivity(Intent(this, MessengerHubActivity::class.java))
-        }
-        header.addView(messengerBtn, LinearLayout.LayoutParams(dp(44), dp(44)).apply {
-            marginStart = dp(6)
-        })
-
         val setBtn = GlassIconButton(this, KIcon.SETTINGS, false, "تنظیمات")
         setBtn.setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
@@ -197,7 +189,8 @@ class MainActivity : ComponentActivity() {
         statusCard.addView(statusHost, vlp(0))
         content.addView(statusCard, vlp(14))
         statusCard.enter(260)
-                val cmdCard = neonCard(this)
+
+        val cmdCard = neonCard(this)
         cmdCard.addView(label(this, "فرمان بده", 16f, Neon.GREEN, true))
         val row = hRow().apply { gravity = Gravity.CENTER_VERTICAL }
 
@@ -352,7 +345,40 @@ class MainActivity : ComponentActivity() {
         securityCard.addView(securityButton, vlp(12))
         content.addView(securityCard, vlp(14))
         securityCard.enter(520)
-                val actions = neonCard(this)
+
+        val funCard = neonCard(this)
+        funCard.addView(label(this, "سرگرمی", 18f, Neon.GREEN, true))
+        funCard.addView(
+            label(this, "بازی آفلاین KING RUN", 14f, Neon.TEXT_DIM),
+            vlp(8)
+        )
+        val gameButton = NeonButton(this, "▶  شروع بازی KING RUN", true)
+        gameButton.setOnClickListener {
+            try {
+                startActivity(Intent(this, KingRunActivity::class.java))
+            } catch (_: Exception) {
+                toast("باز کردن بازی ناموفق بود.")
+            }
+        }
+        funCard.addView(gameButton, vlp(12))
+        content.addView(funCard, vlp(14))
+        funCard.enter(540)
+
+        val histCard = neonCard(this)
+        histCard.addView(label(this, "آخرین فرمان‌ها", 16f, Neon.GREEN, true))
+        historyHost = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        histCard.addView(historyHost, vlp(8))
+        val allBtn = NeonButton(this, "نمایش همه و پاک‌کردن", true)
+        allBtn.setOnClickListener {
+            startActivity(Intent(this, HistoryActivity::class.java))
+        }
+        histCard.addView(allBtn, vlp(14))
+        content.addView(histCard, vlp(14))
+        histCard.enter(590)
+
+        val actions = neonCard(this)
         actions.addView(label(this, "کنترل پنل شناور", 16f, Neon.GREEN, true))
         val startBtn = NeonButton(this, "فعال‌سازی پنجره شناور")
         startBtn.setOnClickListener { startPanel() }
@@ -376,12 +402,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun hasTelegramNotificationAccess(): Boolean {
-        val enabled = Settings.Secure.getString(
-            contentResolver,
-            "enabled_notification_listeners"
-        ) ?: return false
-
-        return enabled.contains(packageName)
+        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        return manager.enabledNotificationListenerPackages.contains(packageName)
     }
 
     private fun statusRow(
@@ -457,7 +479,8 @@ class MainActivity : ComponentActivity() {
             statusHost.addView(b, vlp(14))
         }
     }
-        private fun refreshHistory() {
+
+    private fun refreshHistory() {
         historyHost.removeAllViews()
         val entries = HistoryStore.list(this).take(3)
         if (entries.isEmpty()) {
@@ -536,88 +559,4 @@ class MainActivity : ComponentActivity() {
         pendingFileContent = null
         saveFileButton.isEnabled = false
         resultView.setTextColor(Neon.GREEN)
-        resultView.text = "در حال فکر کردن..."
-
-        hideKeyboard()
-
-        ApiClient.sendMessage(this, question) { response ->
-            if (isFinishing || isDestroyed) return@sendMessage
-
-            aiBusy = false
-
-            resultView.setTextColor(
-                if (response.success) Neon.GREEN_SOFT
-                else Neon.AMBER
-            )
-
-            resultView.text = response.message
-
-            pendingFileContent =
-                if (response.success) response.message else null
-
-            saveFileButton.isEnabled = response.success
-
-            HistoryStore.add(this, question, response.message)
-            refreshHistory()
-            refreshStatus()
-        }
-    }
-
-    private fun hideKeyboard() {
-        val imm = getSystemService(INPUT_METHOD_SERVICE)
-            as InputMethodManager
-
-        imm.hideSoftInputFromWindow(input.windowToken, 0)
-    }
-
-    private fun startVoice() {
-        try {
-            voiceLauncher.launch(VoiceInput.createIntent())
-        } catch (_: Exception) {
-            toast("تشخیص گفتار در دسترس نیست.")
-        }
-    }
-
-    private fun startPanel() {
-        if (!Settings.canDrawOverlays(this)) {
-            toast("ابتدا مجوز پنل شناور را فعال کن.")
-            openOverlaySettings()
-            return
-        }
-
-        startService(Intent(this, OverlayService::class.java))
-        toast("پنل شناور فعال شد.")
-        refreshStatus()
-    }
-
-    private fun stopPanel() {
-        stopService(Intent(this, OverlayService::class.java))
-        toast("پنل شناور بسته شد.")
-        refreshStatus()
-    }
-
-    private fun openOverlaySettings() {
-        try {
-            startActivity(
-                Intent(
-                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:$packageName")
-                )
-            )
-        } catch (_: Exception) {
-            toast("باز کردن تنظیمات ناموفق بود.")
-        }
-    }
-
-    private fun toast(message: String) {
-        android.widget.Toast.makeText(
-            this,
-            message,
-            android.widget.Toast.LENGTH_SHORT
-        ).show()
-    }
-
-    private fun dp(value: Int): Int {
-        return (value * resources.displayMetrics.density).toInt()
-    }
-}
+        resultView.text
