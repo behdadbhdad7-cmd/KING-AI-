@@ -1,3 +1,4 @@
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -36,10 +37,12 @@ android {
 
 dependencies {
     implementation("androidx.activity:activity:1.10.1")
-
     implementation("androidx.camera:camera-camera2:1.4.2")
     implementation("androidx.camera:camera-lifecycle:1.4.2")
     implementation("androidx.camera:camera-view:1.4.2")
-
     implementation("androidx.core:core-ktx:1.15.0")
+
+    // Telegram TDLib
+    implementation("io.github.tdlib-android:core:0.1.1")
+    implementation("io.github.tdlib-android:ktx:0.1.1")
 }
