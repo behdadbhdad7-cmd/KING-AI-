@@ -74,6 +74,7 @@ class MessengerHubActivity : Activity() {
         root.addView(description)
 
         val scroll = ScrollView(this)
+
         val list = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
@@ -81,8 +82,8 @@ class MessengerHubActivity : Activity() {
         addMessenger(
             list,
             "تلگرام",
-            "مشاهده اعلان‌های تلگرام",
-            "باز کردن پیام‌ها",
+            "مدیریت و افزودن حساب‌های تلگرام",
+            "ورود به حساب‌های تلگرام",
             true
         )
 
@@ -119,6 +120,7 @@ class MessengerHubActivity : Activity() {
         )
 
         scroll.addView(list)
+
         root.addView(
             scroll,
             LinearLayout.LayoutParams(
@@ -163,7 +165,7 @@ class MessengerHubActivity : Activity() {
         )
 
         val status = TextView(this).apply {
-            text = if (isTelegram) "اعلان‌ها" else "غیرفعال"
+            text = if (isTelegram) "قابل اتصال" else "به‌زودی"
             textSize = 11f
             setTextColor(if (isTelegram) green else muted)
             gravity = Gravity.CENTER
@@ -205,7 +207,7 @@ class MessengerHubActivity : Activity() {
                     startActivity(
                         Intent(
                             this@MessengerHubActivity,
-                            TelegramInboxActivity::class.java
+                            TelegramAccountsActivity::class.java
                         )
                     )
                 } else {
