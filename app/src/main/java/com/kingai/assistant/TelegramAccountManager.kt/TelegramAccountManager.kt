@@ -1,332 +1,278 @@
 
 package com.kingai.assistant
 
-import android.content.Context
-import io.github.tdlibandroid.ktx.TdClient
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
-import org.drinkless.tdlib.TdApi
-import java.io.File
+import android.app.Activity
+import android.app.AlertDialog
+import android.os.Bundle
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.view.Gravity
+import android.widget.*
+import kotlinx.coroutines.*
 
-/**
- * مدیریت دو حساب مستقل تلگرام برای KING AI
- * هر حساب پوشه و نشست جداگانه دارد.
- */
-class TelegramAccountManager(context: Context) {
+class TelegramAccountsActivity : Activity() {
 
-    companion object {
-        const val ACCOUNT_ONE = "account1"
-        const val ACCOUNT_TWO = "account2"
-    }
+    private val green = Color.rgb(0, 255, 130)
+    private val bg = Color.rgb(5, 12, 9)
+    private val cardColor = Color.rgb(15, 29, 22)
 
-    data class AccountInfo(
-        val id: String,
-        val name: String = "حساب تلگرام",
-        val phone: String = "",
-        val status: String = "اتصال برقرار نشده",
-        val authorized: Boolean = false
-    )
+    private lateinit var manager: TelegramAccountManager
+    private val uiScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private lateinit var list: LinearLayout
 
-    private val appContext = context.applicationContext
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
 
-    private val scope = CoroutineScope(
-        SupervisorJob() + Dispatchers.IO
-    )
+        manager = TelegramAccountManager(this)
 
-    private val clients = mutableMapOf<String, TdClient>()
+        window.statusBarColor = bg
+        window.navigationBarColor = bg
 
-    private val _accounts =
-        MutableStateFlow(
-            mapOf(
-                ACCOUNT_ONE to AccountInfo(ACCOUNT_ONE),
-                ACCOUNT_TWO to AccountInfo(ACCOUNT_TWO)
-            )
-        )
-
-    val accounts: StateFlow<Map<String, AccountInfo>> =
-        _accounts.asStateFlow()
-
-    private fun updateAccount(
-        id: String,
-        transform: (AccountInfo) -> AccountInfo
-    ) {
-        val current = _accounts.value[id] ?: return
-        _accounts.value = _accounts.value.toMutableMap().apply {
-            put(id, transform(current))
-        }
-    }
-
-    /**
-     * راه‌اندازی یک حساب مستقل
-     */
-    fun startAccount(id: String): Boolean {
-        if (id != ACCOUNT_ONE && id != ACCOUNT_TWO) return false
-
-        if (clients.containsKey(id)) return true
-
-        val apiId = BuildConfig.TELEGRAM_API_ID.toIntOrNull()
-            ?: run {
-                updateAccount(id) {
-                    it.copy(status = "API ID تنظیم نشده")
-                }
-                return false
-            }
-
-        val apiHash = BuildConfig.TELEGRAM_API_HASH
-
-        if (apiHash.isBlank()) {
-            updateAccount(id) {
-                it.copy(status = "API HASH تنظیم نشده")
-            }
-            return false
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(18, 18, 18, 18)
+            setBackgroundColor(bg)
         }
 
-        return try {
-            System.loadLibrary("tdjni")
-
-            val accountDirectory = File(
-                appContext.filesDir,
-                "telegram_accounts/$id"
-            )
-
-            accountDirectory.mkdirs()
-
-            val client = TdClient(
-                filesDir = accountDirectory.absolutePath,
-                verbosityLevel = 1,
-                apiId = apiId,
-                apiHash = apiHash
-            )
-
-            clients[id] = client
-
-            updateAccount(id) {
-                it.copy(status = "در حال اتصال به تلگرام...")
-            }
-
-            scope.launch {
-                try {
-                    client.updates.collect { update ->
-                        if (update is TdApi.UpdateAuthorizationState) {
-                            handleAuthorization(id, client, update)
-                        }
-                    }
-                } catch (e: Exception) {
-                    updateAccount(id) {
-                        it.copy(status = "خطا در دریافت وضعیت اتصال")
-                    }
-                }
-            }
-
-            client.init()
-            true
-
-        } catch (e: Exception) {
-            clients.remove(id)
-
-            updateAccount(id) {
-                it.copy(status = "خطا: ${e.message ?: "اتصال ناموفق"}")
-            }
-
-            false
+        val title = TextView(this).apply {
+            text = "‹   مدیریت حساب‌های تلگرام"
+            textSize = 22f
+            setTextColor(green)
+            typeface = Typeface.DEFAULT_BOLD
+            setOnClickListener { finish() }
         }
-    }
+        root.addView(title)
 
-    /**
-     * بررسی وضعیت ورود حساب
-     */
-    private fun handleAuthorization(
-        id: String,
-        client: TdClient,
-        update: TdApi.UpdateAuthorizationState
-    ) {
-        when (val state = update.authorizationState) {
+        val subtitle = TextView(this).apply {
+            text = "حساب‌ها مستقل از یکدیگر مدیریت می‌شوند"
+            textSize = 13f
+            setTextColor(Color.LTGRAY)
+            setPadding(0, 12, 0, 20)
+        }
+        root.addView(subtitle)
 
-            is TdApi.AuthorizationStateWaitTdlibParameters -> {
-                updateAccount(id) {
-                    it.copy(status = "در حال آماده‌سازی...")
-                }
-            }
+        list = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
 
-            is TdApi.AuthorizationStateWaitPhoneNumber -> {
-                updateAccount(id) {
-                    it.copy(status = "منتظر شماره تلفن")
-                }
-            }
+        val scroll = ScrollView(this)
+        scroll.addView(list)
+        root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
 
-            is TdApi.AuthorizationStateWaitCode -> {
-                updateAccount(id) {
-                    it.copy(status = "کد تأیید ارسال شد")
-                }
-            }
+        setContentView(root)
 
-            is TdApi.AuthorizationStateWaitPassword -> {
-                updateAccount(id) {
-                    it.copy(status = "منتظر رمز دومرحله‌ای")
-                }
-            }
-
-            is TdApi.AuthorizationStateWaitEmailAddress -> {
-                updateAccount(id) {
-                    it.copy(status = "منتظر ایمیل تأیید")
-                }
-            }
-
-            is TdApi.AuthorizationStateWaitEmailCode -> {
-                updateAccount(id) {
-                    it.copy(status = "منتظر کد ایمیل")
-                }
-            }
-
-            is TdApi.AuthorizationStateWaitRegistration -> {
-                updateAccount(id) {
-                    it.copy(status = "نیازمند ثبت‌نام")
-                }
-            }
-
-            is TdApi.AuthorizationStateReady -> {
-                updateAccount(id) {
-                    it.copy(
-                        status = "متصل",
-                        authorized = true
-                    )
-                }
-
-                scope.launch {
-                    try {
-                        val me = client.send(TdApi.GetMe())
-
-                        if (me is TdApi.User) {
-                            val fullName = listOf(
-                                me.firstName,
-                                me.lastName
-                            ).filter { it.isNotBlank() }
-                                .joinToString(" ")
-
-                            updateAccount(id) {
-                                it.copy(
-                                    name = fullName.ifBlank {
-                                        "حساب تلگرام"
-                                    },
-                                    authorized = true,
-                                    status = "متصل"
-                                )
-                            }
-                        }
-                    } catch (_: Exception) {
-                    }
-                }
-            }
-
-            is TdApi.AuthorizationStateClosed -> {
-                updateAccount(id) {
-                    it.copy(
-                        status = "نشست بسته شد",
-                        authorized = false
-                    )
-                }
-            }
-
-            else -> {
-                updateAccount(id) {
-                    it.copy(status = "در حال بررسی وضعیت...")
-                }
+        uiScope.launch {
+            manager.accounts.collect {
+                renderAccounts()
             }
         }
+
+        manager.startAccount(TelegramAccountManager.ACCOUNT_ONE)
+        manager.startAccount(TelegramAccountManager.ACCOUNT_TWO)
     }
 
-    /**
-     * ارسال شماره تلفن
-     */
-    fun submitPhone(id: String, phone: String) {
-        val client = clients[id] ?: return
+    private fun renderAccounts() {
+        list.removeAllViews()
 
-        scope.launch {
-            try {
-                client.send(
-                    TdApi.SetAuthenticationPhoneNumber(
-                        phone,
-                        null
-                    )
-                )
-            } catch (e: Exception) {
-                updateAccount(id) {
-                    it.copy(status = "خطا در ارسال شماره")
+        val accounts = manager.accounts.value
+
+        accounts.values.forEach { account ->
+
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(16, 16, 16, 16)
+                background = rounded(cardColor, green)
+            }
+
+            val name = TextView(this).apply {
+                text = account.name
+                textSize = 19f
+                setTextColor(Color.WHITE)
+                typeface = Typeface.DEFAULT_BOLD
+            }
+            card.addView(name)
+
+            val phone = TextView(this).apply {
+                text = if (account.phone.isBlank()) "شماره: هنوز ثبت نشده"
+                else "شماره: ${account.phone}"
+                textSize = 13f
+                setTextColor(Color.LTGRAY)
+                setPadding(0, 8, 0, 8)
+            }
+            card.addView(phone)
+
+            val status = TextView(this).apply {
+                text = "● ${account.status}"
+                textSize = 13f
+                setTextColor(green)
+            }
+            card.addView(status)
+
+            val actions = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+            }
+
+            val connect = makeButton(
+                if (account.authorized) "متصل" else "اتصال / ورود"
+            ) {
+                if (!account.authorized) {
+                    showLogin(account.id)
                 }
             }
+
+            val manage = makeButton("مدیریت") {
+                showManagement(account.id)
+            }
+
+            val delete = makeButton("حذف حساب") {
+                confirmDelete(account.id)
+            }
+
+            actions.addView(connect, weightParams())
+            actions.addView(manage, weightParams())
+            actions.addView(delete, weightParams())
+
+            card.addView(actions)
+
+            val params = LinearLayout.LayoutParams(-1, -2)
+            params.bottomMargin = 16
+            list.addView(card, params)
+        }
+
+        val add = makeButton("+ افزودن حساب تلگرام") {
+            val free = accounts.values.firstOrNull {
+                !it.authorized &&
+                it.status != "در حال اتصال..."
+            }
+
+            if (free == null) {
+                Toast.makeText(this, "هر دو جایگاه حساب استفاده شده‌اند", Toast.LENGTH_LONG).show()
+            } else {
+                showLogin(free.id)
+            }
+        }
+
+        list.addView(add, LinearLayout.LayoutParams(-1, -2))
+    }
+
+    private fun showManagement(id: String) {
+        val account = manager.accounts.value[id] ?: return
+
+        AlertDialog.Builder(this)
+            .setTitle(account.name)
+            .setMessage("وضعیت: ${account.status}\n\nمدیریت این حساب")
+            .setPositiveButton("فعال‌سازی") { _, _ ->
+                manager.startAccount(id)
+            }
+            .setNeutralButton("غیرفعال‌سازی") { _, _ ->
+                manager.closeAccount(id)
+            }
+            .setNegativeButton("بستن", null)
+            .show()
+    }
+
+    private fun confirmDelete(id: String) {
+        AlertDialog.Builder(this)
+            .setTitle("حذف حساب")
+            .setMessage("آیا می‌خواهی نشست این حساب از دستگاه خارج شود؟ حساب دیگر دست‌نخورده می‌ماند.")
+            .setNegativeButton("انصراف", null)
+            .setPositiveButton("حذف حساب") { _, _ ->
+                manager.closeAccount(id)
+                Toast.makeText(this, "نشست بسته شد", Toast.LENGTH_SHORT).show()
+            }
+            .show()
+    }
+
+    private fun showLogin(id: String) {
+        manager.startAccount(id)
+
+        val input = EditText(this).apply {
+            hint = "شماره تلفن با کد کشور"
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.GRAY)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("ورود به حساب تلگرام")
+            .setMessage("شماره تلفن را وارد کن")
+            .setView(input)
+            .setNegativeButton("انصراف", null)
+            .setPositiveButton("ادامه") { _, _ ->
+                val phone = input.text.toString().trim()
+                if (phone.isNotBlank()) {
+                    manager.submitPhone(id, phone)
+                    showCode(id)
+                }
+            }
+            .show()
+    }
+
+    private fun showCode(id: String) {
+        val input = EditText(this).apply {
+            hint = "کد تأیید تلگرام"
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.GRAY)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("کد تأیید")
+            .setView(input)
+            .setNegativeButton("بعداً", null)
+            .setPositiveButton("تأیید") { _, _ ->
+                manager.submitCode(id, input.text.toString().trim())
+                showPassword(id)
+            }
+            .show()
+    }
+
+    private fun showPassword(id: String) {
+        val input = EditText(this).apply {
+            hint = "در صورت داشتن رمز دومرحله‌ای"
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.GRAY)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("رمز دومرحله‌ای")
+            .setView(input)
+            .setNegativeButton("فعلاً نه", null)
+            .setPositiveButton("ارسال") { _, _ ->
+                if (input.text.isNotBlank()) {
+                    manager.submitPassword(id, input.text.toString())
+                }
+            }
+            .show()
+    }
+
+    private fun makeButton(text: String, action: () -> Unit): TextView {
+        return TextView(this).apply {
+            this.text = text
+            textSize = 12f
+            gravity = Gravity.CENTER
+            setTextColor(green)
+            setPadding(8, 14, 8, 14)
+            background = rounded(bg, green)
+            setOnClickListener { action() }
         }
     }
 
-    /**
-     * ارسال کد تأیید
-     */
-    fun submitCode(id: String, code: String) {
-        val client = clients[id] ?: return
-
-        scope.launch {
-            try {
-                client.send(
-                    TdApi.CheckAuthenticationCode(code)
-                )
-            } catch (e: Exception) {
-                updateAccount(id) {
-                    it.copy(status = "کد تأیید پذیرفته نشد")
-                }
-            }
-        }
-    }
-
-    /**
-     * ارسال رمز دومرحله‌ای
-     */
-    fun submitPassword(id: String, password: String) {
-        val client = clients[id] ?: return
-
-        scope.launch {
-            try {
-                client.send(
-                    TdApi.CheckAuthenticationPassword(password)
-                )
-            } catch (e: Exception) {
-                updateAccount(id) {
-                    it.copy(status = "رمز واردشده صحیح نیست")
-                }
-            }
-        }
-    }
-
-    /**
-     * بستن یک نشست بدون بستن حساب دیگر
-     */
-    fun closeAccount(id: String) {
-        clients.remove(id)?.close()
-
-        updateAccount(id) {
-            it.copy(
-                status = "اتصال قطع شد",
-                authorized = false
-            )
-        }
-    }
-
-    /**
-     * آزادسازی منابع هنگام پایان کار مدیر
-     */
-    fun dispose() {
-        clients.values.toList().forEach {
-            try {
-                it.close()
-            } catch (_: Exception) {
-            }
+    private fun weightParams() =
+        LinearLayout.LayoutParams(0, -2, 1f).apply {
+            setMargins(3, 12, 3, 0)
         }
 
-        clients.clear()
-        scope.cancel()
+    private fun rounded(color: Int, border: Int) =
+        GradientDrawable().apply {
+            setColor(color)
+            cornerRadius = 18f
+            setStroke(1, border)
+        }
+
+    override fun onDestroy() {
+        uiScope.cancel()
+        manager.dispose()
+        super.onDestroy()
     }
 }
