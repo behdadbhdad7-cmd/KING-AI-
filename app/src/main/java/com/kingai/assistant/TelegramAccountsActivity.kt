@@ -2,6 +2,7 @@
 package com.kingai.assistant
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.os.Bundle
 import android.graphics.Color
 import android.view.Gravity
@@ -13,42 +14,52 @@ import kotlinx.coroutines.flow.collect
 class TelegramAccountsActivity : Activity() {
 
     private lateinit var manager: TelegramAccountManager
+
     private val uiScope = CoroutineScope(
         SupervisorJob() + Dispatchers.Main
     )
 
     private val green = Color.rgb(0, 255, 130)
-    private val background = Color.rgb(5, 13, 10)
-    private val card = Color.rgb(13, 27, 21)
+    private val bgColor = Color.rgb(5, 13, 10)
+    private val cardColor = Color.rgb(13, 27, 21)
     private val white = Color.WHITE
+
     private lateinit var root: LinearLayout
-    private lateinit var statusViews: MutableMap<String, TextView>
+    private val statusViews = mutableMapOf<String, TextView>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         manager = TelegramAccountManager(this)
-        statusViews = mutableMapOf()
 
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(20, 25, 20, 20)
-            setBackgroundColor(background)
+            setBackgroundColor(bgColor)
         }
 
         val scroll = ScrollView(this)
-        scroll.addView(root)
+        scroll.addView(
+            root,
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
         setContentView(scroll)
 
         addText("مرکز حساب‌های تلگرام", 24f, green, true)
-        addText(
-            "مدیریت دو حساب مستقل تلگرام",
-            14f,
-            Color.LTGRAY
+        addText("مدیریت دو حساب مستقل تلگرام", 14f, Color.LTGRAY)
+
+        addAccountCard(
+            TelegramAccountManager.ACCOUNT_ONE,
+            "حساب اول"
         )
 
-        addAccountCard(TelegramAccountManager.ACCOUNT_ONE, "حساب اول")
-        addAccountCard(TelegramAccountManager.ACCOUNT_TWO, "حساب دوم")
+        addAccountCard(
+            TelegramAccountManager.ACCOUNT_TWO,
+            "حساب دوم"
+        )
 
         val back = makeButton("بازگشت")
         back.setOnClickListener { finish() }
@@ -65,10 +76,11 @@ class TelegramAccountsActivity : Activity() {
     }
 
     private fun addAccountCard(id: String, title: String) {
+
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(18, 18, 18, 18)
-            setBackgroundColor(card)
+            setBackgroundColor(cardColor)
         }
 
         val heading = TextView(this).apply {
@@ -97,11 +109,14 @@ class TelegramAccountsActivity : Activity() {
         }
 
         val phone = makeButton("وارد کردن شماره تلفن")
-        phone.setOnClickListener { showPhoneDialog(id) }
+        phone.setOnClickListener {
+            showPhoneDialog(id)
+        }
 
         val close = makeButton("قطع اتصال همین حساب")
         close.setOnClickListener {
             manager.closeAccount(id)
+            status.text = "این حساب قطع شد"
         }
 
         box.addView(heading)
@@ -115,27 +130,38 @@ class TelegramAccountsActivity : Activity() {
             ViewGroup.LayoutParams.WRAP_CONTENT
         )
         params.bottomMargin = 20
+
         root.addView(box, params)
     }
 
     private fun showPhoneDialog(id: String) {
+
         val current = manager.accounts.value[id]
 
         when {
             current?.status?.contains("کد تأیید") == true -> {
-                showInput("کد تأیید تلگرام", "کد ارسال‌شده") {
+                showInput(
+                    "کد تأیید تلگرام",
+                    "کد ارسال‌شده"
+                ) {
                     manager.submitCode(id, it)
                 }
             }
 
             current?.status?.contains("رمز دومرحله‌ای") == true -> {
-                showInput("رمز دومرحله‌ای", "رمز حساب") {
+                showInput(
+                    "رمز دومرحله‌ای",
+                    "رمز حساب"
+                ) {
                     manager.submitPassword(id, it)
                 }
             }
 
             else -> {
-                showInput("شماره تلفن", "+989xxxxxxxxx") {
+                showInput(
+                    "شماره تلفن",
+                    "+989xxxxxxxxx"
+                ) {
                     manager.submitPhone(id, it)
                 }
             }
@@ -147,6 +173,7 @@ class TelegramAccountsActivity : Activity() {
         hint: String,
         callback: (String) -> Unit
     ) {
+
         val input = EditText(this).apply {
             this.hint = hint
             setTextColor(white)
@@ -161,7 +188,9 @@ class TelegramAccountsActivity : Activity() {
             .setNegativeButton("لغو", null)
             .setPositiveButton("ارسال") { _, _ ->
                 val value = input.text.toString().trim()
-                if (value.isNotBlank()) callback(value)
+                if (value.isNotBlank()) {
+                    callback(value)
+                }
             }
             .show()
     }
@@ -172,14 +201,18 @@ class TelegramAccountsActivity : Activity() {
         color: Int,
         bold: Boolean = false
     ) {
+
         val view = TextView(this).apply {
             text = value
             textSize = size
             setTextColor(color)
             gravity = Gravity.CENTER
-            if (bold) setTypeface(null, android.graphics.Typeface.BOLD)
+            if (bold) {
+                setTypeface(null, android.graphics.Typeface.BOLD)
+            }
             setPadding(0, 12, 0, 12)
         }
+
         root.addView(view)
     }
 
@@ -193,8 +226,8 @@ class TelegramAccountsActivity : Activity() {
     }
 
     override fun onDestroy() {
-        super.onDestroy()
         uiScope.cancel()
         manager.dispose()
+        super.onDestroy()
     }
 }
