@@ -7,6 +7,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import java.util.concurrent.Executors
 
 object ApiClient {
@@ -43,14 +45,14 @@ object ApiClient {
             return ApiResult(false, "کلید API تنظیم نشده است.")
         }
 
-        // حذف فاصله و پیشوند Bearer در صورت کپی اشتباه
-        var token = rawToken.trim()
+        val token = rawToken.trim()
+            .removePrefix("Bearer ")
+            .trim()
 
-        if (token.startsWith("Bearer ", ignoreCase = true)) {
-            token = token.substring(7).trim()
-        }
+        val baseUrl = ApiConfig.getBaseUrl(context)
+            .trim()
+            .trimEnd('/')
 
-        val baseUrl = ApiConfig.getBaseUrl(context).trim().trimEnd('/')
         val model = ApiConfig.getModel(context).trim()
 
         if (token.isBlank()) {
@@ -65,15 +67,23 @@ object ApiClient {
             return ApiResult(false, "آدرس سرویس باید HTTPS باشد.")
         }
 
+        val endpoint = when {
+            baseUrl.endsWith("/chat/completions", true) ->
+                baseUrl
+
+            baseUrl.endsWith("/v1beta/openai", true) ->
+                "$baseUrl/chat/completions"
+
+            baseUrl.endsWith("/v1", true) ->
+                "$baseUrl/chat/completions"
+
+            else ->
+                "$baseUrl/v1/chat/completions"
+        }
+
         var connection: HttpURLConnection? = null
 
         return try {
-
-            val endpoint = if (baseUrl.endsWith("/v1", true)) {
-                "$baseUrl/chat/completions"
-            } else {
-                "$baseUrl/v1/chat/completions"
-            }
 
             connection = URL(endpoint).openConnection()
                 as HttpURLConnection
@@ -115,7 +125,9 @@ object ApiClient {
             }
 
             connection.outputStream.use { output ->
-                output.write(body.toString().toByteArray(Charsets.UTF_8))
+                output.write(
+                    body.toString().toByteArray(Charsets.UTF_8)
+                )
             }
 
             val status = connection.responseCode
@@ -146,11 +158,11 @@ object ApiClient {
                 return ApiResult(
                     false,
                     when (status) {
-                        400 -> "درخواست نامعتبر است: ${detail.take(300)}"
-                        401 -> "خطای احراز هویت (401): ${detail.take(300)}"
-                        403 -> "دسترسی ممنوع (403): ${detail.take(300)}"
-                        404 -> "مسیر یا مدل پیدا نشد (404): ${detail.take(300)}"
-                        429 -> "محدودیت درخواست یا اعتبار سرویس (429): ${detail.take(300)}"
+                        400 -> "درخواست نامعتبر: ${detail.take(300)}"
+                        401 -> "کلید API نامعتبر است (401): ${detail.take(300)}"
+                        403 -> "دسترسی به سرویس ممنوع است (403): ${detail.take(300)}"
+                        404 -> "مدل یا مسیر پیدا نشد (404): ${detail.take(300)}"
+                        429 -> "سهمیه رایگان یا محدودیت درخواست تمام شده (429): ${detail.take(300)}"
                         in 500..599 -> "خطای سرور ($status): ${detail.take(300)}"
                         else -> "خطای HTTP $status: ${detail.take(300)}"
                     }
@@ -201,9 +213,9 @@ object ApiClient {
                 ApiResult(true, answer)
             }
 
-        } catch (e: java.net.SocketTimeoutException) {
+        } catch (_: SocketTimeoutException) {
             ApiResult(false, "زمان اتصال تمام شد؛ دوباره تلاش کن.")
-        } catch (e: java.net.UnknownHostException) {
+        } catch (_: UnknownHostException) {
             ApiResult(false, "اینترنت یا آدرس سرور در دسترس نیست.")
         } catch (e: Exception) {
             ApiResult(
