@@ -120,7 +120,9 @@ class TelegramAccountManager private constructor(context: Context) {
     }
 
     fun startAccount(id: String): Boolean {
-        if (id != ACCOUNT_ONE && id != ACCOUNT_TWO) return false
+        if (id != ACCOUNT_ONE && id != ACCOUNT_TWO) {
+            return false
+        }
 
         if (clients.containsKey(id)) return true
 
@@ -168,18 +170,27 @@ class TelegramAccountManager private constructor(context: Context) {
                 try {
                     client.updates.collect { update ->
                         if (update is TdApi.UpdateAuthorizationState) {
-                            handleAuthorization(id, client, update)
+                            handleAuthorization(
+                                id,
+                                client,
+                                update
+                            )
                         }
                     }
-                } catch (_: Exception) {
+                } catch (e: Exception) {
                     updateAccount(id) {
-                        it.copy(status = "خطا در دریافت وضعیت اتصال")
+                        it.copy(
+                            status = "خطا در دریافت وضعیت: ${
+                                e.message ?: "نامشخص"
+                            }"
+                        )
                     }
                 }
             }
 
             client.init()
             rememberAccount(id)
+
             true
 
         } catch (e: Exception) {
@@ -187,7 +198,9 @@ class TelegramAccountManager private constructor(context: Context) {
 
             updateAccount(id) {
                 it.copy(
-                    status = "خطا: ${e.message ?: "اتصال ناموفق"}"
+                    status = "خطا: ${
+                        e.message ?: "اتصال ناموفق"
+                    }"
                 )
             }
 
@@ -272,6 +285,7 @@ class TelegramAccountManager private constructor(context: Context) {
                                     name = fullName.ifBlank {
                                         "حساب تلگرام"
                                     },
+                                    phone = me.phoneNumber,
                                     authorized = true,
                                     status = "متصل"
                                 )
@@ -293,23 +307,68 @@ class TelegramAccountManager private constructor(context: Context) {
 
             else -> {
                 updateAccount(id) {
-                    it.copy(status = "در حال بررسی وضعیت...")
+                    it.copy(
+                        status = "در حال بررسی وضعیت..."
+                    )
                 }
             }
         }
     }
 
+    // ارسال شماره تلفن و نمایش خطای واقعی تلگرام
     fun submitPhone(id: String, phone: String) {
-        val client = clients[id] ?: return
+        val client = clients[id] ?: run {
+            updateAccount(id) {
+                it.copy(
+                    status = "خطا: اتصال حساب برقرار نیست"
+                )
+            }
+            return
+        }
+
+        val cleanPhone = phone.trim().replace(" ", "")
+
+        if (
+            !cleanPhone.startsWith("+") ||
+            cleanPhone.length < 8 ||
+            cleanPhone.drop(1).any { !it.isDigit() }
+        ) {
+            updateAccount(id) {
+                it.copy(
+                    status = "شماره نامعتبر است؛ با کد کشور وارد کن"
+                )
+            }
+            return
+        }
+
+        updateAccount(id) {
+            it.copy(status = "در حال ارسال شماره...")
+        }
 
         scope.launch {
             try {
-                client.send(
-                    TdApi.SetAuthenticationPhoneNumber(phone, null)
+                val result = client.send(
+                    TdApi.SetAuthenticationPhoneNumber(
+                        cleanPhone,
+                        null
+                    )
                 )
-            } catch (_: Exception) {
+
+                if (result is TdApi.Error) {
+                    updateAccount(id) {
+                        it.copy(
+                            status = "خطای تلگرام ${result.code}: ${result.message}"
+                        )
+                    }
+                }
+
+            } catch (e: Exception) {
                 updateAccount(id) {
-                    it.copy(status = "خطا در ارسال شماره")
+                    it.copy(
+                        status = "خطای ارسال شماره: ${
+                            e.message ?: e.javaClass.simpleName
+                        }"
+                    )
                 }
             }
         }
@@ -320,10 +379,22 @@ class TelegramAccountManager private constructor(context: Context) {
 
         scope.launch {
             try {
-                client.send(TdApi.CheckAuthenticationCode(code))
-            } catch (_: Exception) {
+                val result = client.send(
+                    TdApi.CheckAuthenticationCode(code.trim())
+                )
+
+                if (result is TdApi.Error) {
+                    updateAccount(id) {
+                        it.copy(
+                            status = "خطای کد ${result.code}: ${result.message}"
+                        )
+                    }
+                }
+            } catch (e: Exception) {
                 updateAccount(id) {
-                    it.copy(status = "کد تأیید پذیرفته نشد")
+                    it.copy(
+                        status = "خطای کد: ${e.message ?: "نامشخص"}"
+                    )
                 }
             }
         }
@@ -334,12 +405,22 @@ class TelegramAccountManager private constructor(context: Context) {
 
         scope.launch {
             try {
-                client.send(
+                val result = client.send(
                     TdApi.CheckAuthenticationPassword(password)
                 )
-            } catch (_: Exception) {
+
+                if (result is TdApi.Error) {
+                    updateAccount(id) {
+                        it.copy(
+                            status = "خطای رمز ${result.code}: ${result.message}"
+                        )
+                    }
+                }
+            } catch (e: Exception) {
                 updateAccount(id) {
-                    it.copy(status = "رمز واردشده صحیح نیست")
+                    it.copy(
+                        status = "خطای رمز: ${e.message ?: "نامشخص"}"
+                    )
                 }
             }
         }
@@ -350,12 +431,22 @@ class TelegramAccountManager private constructor(context: Context) {
 
         scope.launch {
             try {
-                client.send(
-                    TdApi.SetAuthenticationEmailAddress(email)
+                val result = client.send(
+                    TdApi.SetAuthenticationEmailAddress(email.trim())
                 )
-            } catch (_: Exception) {
+
+                if (result is TdApi.Error) {
+                    updateAccount(id) {
+                        it.copy(
+                            status = "خطای ایمیل ${result.code}: ${result.message}"
+                        )
+                    }
+                }
+            } catch (e: Exception) {
                 updateAccount(id) {
-                    it.copy(status = "خطا در ارسال ایمیل")
+                    it.copy(
+                        status = "خطای ایمیل: ${e.message ?: "نامشخص"}"
+                    )
                 }
             }
         }
@@ -366,19 +457,32 @@ class TelegramAccountManager private constructor(context: Context) {
 
         scope.launch {
             try {
-                client.send(
+                val result = client.send(
                     TdApi.CheckAuthenticationEmailCode(
-                        TdApi.EmailAddressAuthenticationCode(code)
+                        TdApi.EmailAddressAuthenticationCode(
+                            code.trim()
+                        )
                     )
                 )
-            } catch (_: Exception) {
+
+                if (result is TdApi.Error) {
+                    updateAccount(id) {
+                        it.copy(
+                            status = "خطای کد ایمیل ${result.code}: ${result.message}"
+                        )
+                    }
+                }
+            } catch (e: Exception) {
                 updateAccount(id) {
-                    it.copy(status = "کد ایمیل پذیرفته نشد")
+                    it.copy(
+                        status = "خطای کد ایمیل: ${e.message ?: "نامشخص"}"
+                    )
                 }
             }
         }
     }
 
+    // قطع اتصال بدون خروج از تلگرام
     fun closeAccount(id: String) {
         clients.remove(id)?.let {
             try {
@@ -395,7 +499,10 @@ class TelegramAccountManager private constructor(context: Context) {
         }
     }
 
+    // خروج واقعی از تلگرام
     fun logoutAccount(id: String) {
+        if (id != ACCOUNT_ONE && id != ACCOUNT_TWO) return
+
         val client = clients[id]
 
         scope.launch {
@@ -411,15 +518,17 @@ class TelegramAccountManager private constructor(context: Context) {
                 }
             }
 
+            forgetAccount(id)
+
             updateAccount(id) {
-                it.copy(
-                    status = "از تلگرام خارج شد",
-                    authorized = false
+                AccountInfo(id).copy(
+                    status = "از تلگرام خارج شد"
                 )
             }
         }
     }
 
+    // حذف کامل حساب از KING AI
     fun removeAccount(id: String) {
         if (id != ACCOUNT_ONE && id != ACCOUNT_TWO) return
 
