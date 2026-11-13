@@ -5,6 +5,8 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.os.Bundle
 import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -15,353 +17,461 @@ import kotlinx.coroutines.flow.collect
 class TelegramAccountsActivity : Activity() {
 
     private lateinit var manager: TelegramAccountManager
-
-    private val uiScope = CoroutineScope(
-        SupervisorJob() + Dispatchers.Main
-    )
+    private val uiScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     private val green = Color.rgb(0, 255, 130)
-    private val bgColor = Color.rgb(5, 13, 10)
-    private val cardColor = Color.rgb(13, 27, 21)
+    private val bg = Color.rgb(5, 12, 10)
+    private val card = Color.rgb(15, 29, 23)
     private val white = Color.WHITE
+    private val muted = Color.rgb(165, 180, 171)
 
     private lateinit var root: LinearLayout
-    private lateinit var addAccountButton: Button
 
-    private val statusViews = mutableMapOf<String, TextView>()
-    private val logoutButtons = mutableMapOf<String, Button>()
-    private val accountCards = mutableMapOf<String, View>()
-
-    private val accountIds = listOf(
+    private val ids = listOf(
         TelegramAccountManager.ACCOUNT_ONE,
         TelegramAccountManager.ACCOUNT_TWO
     )
 
-    private val accountNames = listOf("حساب اول", "حساب دوم")
+    private val names = listOf("حساب ۱", "حساب ۲")
 
-    private val addedAccountIds = mutableSetOf<String>()
-
+    private val added = mutableSetOf<String>()
     private val preferences by lazy {
         getSharedPreferences("telegram_account_ui", MODE_PRIVATE)
     }
+
+    private var currentPage = "accounts"
+    private var selectedId = TelegramAccountManager.ACCOUNT_ONE
+
+    private var statusView: TextView? = null
+    private var connectionView: TextView? = null
+    private var continueButton: Button? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         manager = TelegramAccountManager.get(this)
 
-        addedAccountIds.addAll(
+        added.addAll(
             preferences.getStringSet(
                 "added_account_ids",
                 setOf(TelegramAccountManager.ACCOUNT_ONE)
             ) ?: setOf(TelegramAccountManager.ACCOUNT_ONE)
         )
 
-        addedAccountIds.retainAll(accountIds.toSet())
-        addedAccountIds.add(TelegramAccountManager.ACCOUNT_ONE)
-        saveAddedAccounts()
+        added.retainAll(ids.toSet())
+        added.add(TelegramAccountManager.ACCOUNT_ONE)
+        saveAdded()
 
-        root = LinearLayout(this).apply {
+        showAccountsPage()
+
+        uiScope.launch {
+            manager.accounts.collect { accounts ->
+                if (currentPage == "accounts") {
+                    refreshAccountPage()
+                } else {
+                    val info = accounts[selectedId]
+                    statusView?.text = info?.status ?: "آماده اتصال"
+                    connectionView?.text =
+                        if (info?.authorized == true) "● حساب متصل است"
+                        else "○ حساب هنوز وارد نشده است"
+
+                    continueButton?.text =
+                        authButtonText(info?.status, info?.authorized == true)
+                }
+            }
+        }
+    }
+
+    private fun saveAdded() {
+        preferences.edit()
+            .putStringSet("added_account_ids", added.toSet())
+            .apply()
+    }
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
+
+    private fun makeRoot(): LinearLayout {
+        val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(20, 25, 20, 20)
-            setBackgroundColor(bgColor)
+            setPadding(dp(20), dp(24), dp(20), dp(24))
+            setBackgroundColor(bg)
         }
 
         val scroll = ScrollView(this)
         scroll.addView(
-            root,
+            layout,
             ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
         )
+
         setContentView(scroll)
+        root = layout
+        return layout
+    }
 
-        addText("مرکز حساب‌های تلگرام", 24f, green, true)
-        addText("مدیریت حساب‌های مستقل تلگرام", 14f, Color.LTGRAY)
-
-        // ساخت حساب‌های قبلی
-        accountIds.forEachIndexed { index, id ->
-            if (id in addedAccountIds) {
-                addAccountCard(id, accountNames[index])
-            }
-        }
-
-        // دکمه افزودن حساب
-        addAccountButton = makeButton("افزودن حساب")
-
-        addAccountButton.setOnClickListener {
-            val nextId = accountIds.firstOrNull {
-                it !in addedAccountIds
-            }
-
-            if (nextId == null) {
-                Toast.makeText(
-                    this,
-                    "حداکثر دو حساب قابل افزودن است",
-                    Toast.LENGTH_SHORT
-                ).show()
-                return@setOnClickListener
-            }
-
-            val index = accountIds.indexOf(nextId)
-
-            addedAccountIds.add(nextId)
-            saveAddedAccounts()
-
-            addAccountCard(nextId, accountNames[index])
-            updateAddButton()
-        }
-
-        root.addView(addAccountButton)
-
-        // دکمه بازگشت
-        val back = makeButton("بازگشت")
-        back.setOnClickListener {
-            finish()
-        }
-        root.addView(back)
-
-        updateAddButton()
-
-        // دریافت وضعیت حساب‌ها
-        uiScope.launch {
-            manager.accounts.collect { accounts ->
-                accounts.values.forEach { info ->
-                    statusViews[info.id]?.text =
-                        "${info.name}\n${info.phone}\n${info.status}"
-
-                    logoutButtons[info.id]?.visibility =
-                        if (info.authorized) {
-                            View.VISIBLE
-                        } else {
-                            View.GONE
-                        }
-                }
-            }
+    private fun rounded(color: Int): GradientDrawable {
+        return GradientDrawable().apply {
+            setColor(color)
+            cornerRadius = dp(18).toFloat()
+            setStroke(dp(1), Color.rgb(35, 65, 49))
         }
     }
 
-    private fun saveAddedAccounts() {
-        preferences.edit()
-            .putStringSet(
-                "added_account_ids",
-                addedAccountIds.toSet()
+    private fun addTitle(text: String, size: Float = 24f) {
+        val view = TextView(this).apply {
+            this.text = text
+            textSize = size
+            setTextColor(green)
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding(0, dp(12), 0, dp(12))
+        }
+        root.addView(view)
+    }
+
+    private fun addDescription(text: String) {
+        val view = TextView(this).apply {
+            this.text = text
+            textSize = 13f
+            setTextColor(muted)
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, dp(22))
+        }
+        root.addView(view)
+    }
+
+    private fun makeButton(
+        text: String,
+        primary: Boolean = true
+    ): Button {
+        return Button(this).apply {
+            this.text = text
+            textSize = 14f
+            setTextColor(if (primary) Color.BLACK else green)
+            background = rounded(
+                if (primary) green else card
             )
-            .apply()
+            isAllCaps = false
+            minHeight = dp(52)
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+        }
     }
 
-    private fun updateAddButton() {
-        addAccountButton.visibility =
-            if (addedAccountIds.size >= accountIds.size) {
-                View.GONE
-            } else {
-                View.VISIBLE
-            }
+    private fun addButton(
+        text: String,
+        primary: Boolean = true,
+        action: () -> Unit
+    ): Button {
+        val button = makeButton(text, primary)
+        val params = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        )
+        params.bottomMargin = dp(12)
+        root.addView(button, params)
+        button.setOnClickListener { action() }
+        return button
     }
 
-    private fun addAccountCard(
-        id: String,
-        title: String
-    ) {
-        if (accountCards.containsKey(id)) return
-
+    private fun addCard(title: String, subtitle: String): LinearLayout {
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(18, 18, 18, 18)
-            setBackgroundColor(cardColor)
+            setPadding(dp(18), dp(18), dp(18), dp(18))
+            background = rounded(card)
         }
 
         val heading = TextView(this).apply {
-            text = "●  $title"
-            textSize = 19f
+            text = title
+            textSize = 18f
+            typeface = Typeface.DEFAULT_BOLD
             setTextColor(green)
         }
 
-        val status = TextView(this).apply {
-            text = manager.accounts.value[id]?.status
-                ?: "اتصال برقرار نشده"
-            textSize = 14f
-            setTextColor(white)
-            setPadding(0, 12, 0, 12)
-        }
-
-        statusViews[id] = status
-
-        // اتصال و ورود
-        val connect = makeButton("اتصال / ورود به حساب")
-
-        connect.setOnClickListener {
-            if (manager.startAccount(id)) {
-                showPhoneDialog(id)
-            } else {
-                status.text =
-                    manager.accounts.value[id]?.status
-                        ?: "خطا در اتصال"
-            }
-        }
-
-        // وارد کردن شماره
-        val phone = makeButton("وارد کردن شماره تلفن")
-
-        phone.setOnClickListener {
-            if (manager.startAccount(id)) {
-                showPhoneDialog(id)
-            } else {
-                status.text =
-                    manager.accounts.value[id]?.status
-                        ?: "خطا در اتصال"
-            }
-        }
-
-        // قطع اتصال بدون خروج از تلگرام
-        val close = makeButton("قطع اتصال همین حساب")
-
-        close.setOnClickListener {
-            manager.closeAccount(id)
-            status.text = "اتصال قطع شد؛ نشست ذخیره می‌ماند"
-        }
-
-        // خروج واقعی از تلگرام
-        val logout = makeButton("خروج واقعی از تلگرام")
-
-        logout.visibility =
-            if (manager.accounts.value[id]?.authorized == true) {
-                View.VISIBLE
-            } else {
-                View.GONE
-            }
-
-        logout.setOnClickListener {
-            AlertDialog.Builder(this)
-                .setTitle("خروج از تلگرام")
-                .setMessage(
-                    "آیا مطمئنی می‌خواهی از این حساب خارج شوی؟"
-                )
-                .setNegativeButton("لغو", null)
-                .setPositiveButton("خروج") { _, _ ->
-                    manager.logoutAccount(id)
-                    status.text = "در حال خروج از تلگرام..."
-                }
-                .show()
-        }
-
-        logoutButtons[id] = logout
-
-        // حذف حساب از KING AI
-        val remove = makeButton("حذف حساب از KING AI")
-
-        remove.setOnClickListener {
-            AlertDialog.Builder(this)
-                .setTitle("حذف حساب")
-                .setMessage(
-                    "این کار حساب را از KING AI حذف می‌کند، " +
-                    "از تلگرام خارج می‌شود و اطلاعات نشست محلی را پاک می‌کند. ادامه می‌دهی؟"
-                )
-                .setNegativeButton("لغو", null)
-                .setPositiveButton("حذف") { _, _ ->
-                    manager.removeAccount(id)
-
-                    addedAccountIds.remove(id)
-                    saveAddedAccounts()
-
-                    removeAccountCard(id)
-                    updateAddButton()
-                }
-                .show()
+        val description = TextView(this).apply {
+            text = subtitle
+            textSize = 13f
+            setTextColor(muted)
+            setPadding(0, dp(8), 0, 0)
         }
 
         box.addView(heading)
-        box.addView(status)
-        box.addView(connect)
-        box.addView(phone)
-        box.addView(close)
-        box.addView(logout)
-        box.addView(remove)
+        box.addView(description)
 
         val params = LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.WRAP_CONTENT
         )
+        params.bottomMargin = dp(14)
+        root.addView(box, params)
 
-        params.bottomMargin = 20
+        return box
+    }
 
-        // اصلاح خطای lateinit:
-        // هنگام ساخت اولین کارت، دکمه افزودن هنوز ساخته نشده است.
-        if (
-            ::addAccountButton.isInitialized &&
-            root.indexOfChild(addAccountButton) >= 0
-        ) {
-            root.addView(
-                box,
-                root.indexOfChild(addAccountButton),
-                params
-            )
+    // صفحه انتخاب حساب‌ها
+
+    private fun showAccountsPage() {
+        currentPage = "accounts"
+        makeRoot()
+
+        addTitle("KING AI")
+        addDescription("مرکز مدیریت حساب‌های تلگرام")
+
+        ids.forEachIndexed { index, id ->
+            if (id in added) {
+                val info = manager.accounts.value[id]
+                val connected = info?.authorized == true
+
+                val box = addCard(
+                    "مدیریت ${names[index]}",
+                    if (connected) "● متصل به تلگرام"
+                    else "برای ورود و مدیریت انتخاب کن"
+                )
+
+                box.setOnClickListener {
+                    selectedId = id
+                    showManagementPage(id)
+                }
+
+                box.isClickable = true
+                box.isFocusable = true
+            }
+        }
+
+        if (added.size < ids.size) {
+            addButton("＋ افزودن حساب تلگرام") {
+                val next = ids.firstOrNull { it !in added }
+                if (next != null) {
+                    added.add(next)
+                    saveAdded()
+                    selectedId = next
+                    showManagementPage(next)
+                }
+            }
+        }
+
+        addButton("بازگشت", false) {
+            finish()
+        }
+    }
+
+    private fun refreshAccountPage() {
+        if (currentPage == "accounts") {
+            showAccountsPage()
+        }
+    }
+
+    // پنل مستقل مدیریت هر حساب
+
+    private fun showManagementPage(id: String) {
+        currentPage = "management"
+        selectedId = id
+        makeRoot()
+
+        val index = ids.indexOf(id)
+        val title = names.getOrElse(index) { "حساب تلگرام" }
+        val info = manager.accounts.value[id]
+        val authorized = info?.authorized == true
+
+        addTitle("مدیریت $title")
+        addDescription("پنل اختصاصی دستیار تلگرام KING AI")
+
+        val accountBox = addCard(
+            "وضعیت حساب",
+            if (authorized) {
+                "${info?.name ?: ""}\n${info?.phone ?: ""}"
+            } else {
+                "هنوز به این حساب وارد نشده‌ای"
+            }
+        )
+
+        connectionView = TextView(this).apply {
+            text = if (authorized) "● حساب متصل است" else "○ حساب متصل نیست"
+            textSize = 14f
+            setTextColor(if (authorized) green else muted)
+            setPadding(0, dp(12), 0, 0)
+        }
+        accountBox.addView(connectionView)
+
+        statusView = TextView(this).apply {
+            text = info?.status ?: "آماده اتصال"
+            textSize = 13f
+            setTextColor(muted)
+            setPadding(0, dp(10), 0, 0)
+        }
+        accountBox.addView(statusView)
+
+        if (!authorized) {
+            continueButton = addButton(
+                authButtonText(info?.status, false)
+            ) {
+                if (manager.startAccount(id)) {
+                    showAuthInput(id)
+                } else {
+                    statusView?.text =
+                        manager.accounts.value[id]?.status ?: "خطا در اتصال"
+                }
+            }
         } else {
-            root.addView(box, params)
+            addCard(
+                "دستیار هوشمند",
+                "حساب با موفقیت متصل شده است. تنظیمات پاسخ‌گویی را انجام بده."
+            )
+
+            addCard(
+                "پاسخ‌گویی خودکار",
+                "فعال یا غیرفعال کردن پاسخ به پیام‌های خصوصی"
+            )
+
+            addButton("تنظیمات پاسخ‌گویی") {
+                showReplySettings(id)
+            }
+
+            addCard(
+                "شخصیت و لحن هوش مصنوعی",
+                "انتخاب کن KING AI چگونه با مخاطبان صحبت کند"
+            )
+
+            addButton("تنظیم لحن و زبان پاسخ") {
+                showReplySettings(id)
+            }
+
+            addButton("قطع اتصال حساب") {
+                AlertDialog.Builder(this)
+                    .setTitle("قطع اتصال")
+                    .setMessage("نشست حساب حفظ می‌شود. فقط اتصال برنامه قطع خواهد شد.")
+                    .setNegativeButton("لغو", null)
+                    .setPositiveButton("قطع اتصال") { _, _ ->
+                        manager.closeAccount(id)
+                        showManagementPage(id)
+                    }
+                    .show()
+            }
+
+            addButton("خروج از حساب تلگرام", false) {
+                AlertDialog.Builder(this)
+                    .setTitle("خروج از تلگرام")
+                    .setMessage("آیا می‌خواهی از این حساب خارج شوی؟")
+                    .setNegativeButton("لغو", null)
+                    .setPositiveButton("خروج") { _, _ ->
+                        manager.logoutAccount(id)
+                        showManagementPage(id)
+                    }
+                    .show()
+            }
         }
 
-        accountCards[id] = box
-    }
-
-    private fun removeAccountCard(id: String) {
-        accountCards.remove(id)?.let {
-            root.removeView(it)
+        addButton("بازگشت به حساب‌ها", false) {
+            showAccountsPage()
         }
-
-        statusViews.remove(id)
-        logoutButtons.remove(id)
     }
 
-    private fun showPhoneDialog(id: String) {
-        val current = manager.accounts.value[id]
+    private fun authButtonText(status: String?, authorized: Boolean): String {
+        if (authorized) return "حساب متصل است"
+
+        return when {
+            status?.contains("کد تأیید") == true -> "وارد کردن کد تأیید"
+            status?.contains("رمز دومرحله‌ای") == true -> "وارد کردن رمز دومرحله‌ای"
+            status?.contains("کد ایمیل") == true -> "وارد کردن کد ایمیل"
+            status?.contains("ایمیل") == true -> "وارد کردن ایمیل"
+            else -> "اتصال یا ورود به حساب"
+        }
+    }
+
+    // ورود مرحله‌ای
+
+    private fun showAuthInput(id: String) {
+        val info = manager.accounts.value[id]
+        val status = info?.status ?: ""
 
         when {
-            current?.status?.contains("کد تأیید") == true -> {
-                showInput(
-                    "کد تأیید تلگرام",
-                    "کد ارسال‌شده"
-                ) {
+            info?.authorized == true -> showManagementPage(id)
+
+            status.contains("کد تأیید") -> {
+                showInput("کد تأیید تلگرام", "کد ارسال‌شده") {
                     manager.submitCode(id, it)
                 }
             }
 
-            current?.status?.contains("رمز دومرحله‌ای") == true -> {
-                showInput(
-                    "رمز دومرحله‌ای",
-                    "رمز حساب"
-                ) {
+            status.contains("رمز دومرحله‌ای") -> {
+                showInput("رمز دومرحله‌ای", "رمز حساب") {
                     manager.submitPassword(id, it)
                 }
             }
 
-            current?.status?.contains("کد ایمیل") == true -> {
-                showInput(
-                    "کد ایمیل",
-                    "کد ارسال‌شده به ایمیل"
-                ) {
+            status.contains("کد ایمیل") -> {
+                showInput("کد تأیید ایمیل", "کد ارسال‌شده به ایمیل") {
                     manager.submitEmailCode(id, it)
                 }
             }
 
-            current?.status?.contains("ایمیل") == true -> {
-                showInput(
-                    "ایمیل تأیید",
-                    "آدرس ایمیل"
-                ) {
+            status.contains("ایمیل") -> {
+                showInput("ایمیل", "آدرس ایمیل") {
                     manager.submitEmail(id, it)
                 }
             }
 
-            else -> {
-                showInput(
-                    "شماره تلفن",
-                    "+989xxxxxxxxx"
-                ) {
-                    manager.submitPhone(id, it)
+            else -> showCountryAndPhone(id)
+        }
+    }
+
+    private fun showCountryAndPhone(id: String) {
+        val countries = arrayOf(
+            "ایران  +98",
+            "فنلاند  +358",
+            "آلمان  +49",
+            "ترکیه  +90",
+            "آمریکا  +1",
+            "روسیه  +7",
+            "عراق  +964",
+            "افغانستان  +93"
+        )
+
+        var code = "+98"
+
+        AlertDialog.Builder(this)
+            .setTitle("انتخاب کشور")
+            .setItems(countries) { _, which ->
+                code = countries[which].substringAfter("+").let { "+$it" }
+                showPhoneInput(id, code)
+            }
+            .setNegativeButton("لغو", null)
+            .show()
+    }
+
+    private fun showPhoneInput(id: String, code: String) {
+        val input = EditText(this).apply {
+            hint = "شماره تلفن بدون صفر اول"
+            textSize = 18f
+            setTextColor(white)
+            setHintTextColor(muted)
+            inputType = android.text.InputType.TYPE_CLASS_PHONE
+            setSingleLine(true)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("ورود به تلگرام")
+            .setMessage("کد کشور: $code")
+            .setView(input)
+            .setNegativeButton("لغو", null)
+            .setPositiveButton("ادامه") { _, _ ->
+                var number = input.text.toString().trim()
+                    .replace(" ", "")
+                    .replace("-", "")
+
+                if (number.startsWith("0")) {
+                    number = number.drop(1)
+                }
+
+                if (number.isNotBlank()) {
+                    manager.submitPhone(id, code + number)
+                } else {
+                    Toast.makeText(this, "شماره را وارد کن", Toast.LENGTH_SHORT).show()
                 }
             }
-        }
+            .show()
     }
 
     private fun showInput(
@@ -372,8 +482,8 @@ class TelegramAccountsActivity : Activity() {
         val input = EditText(this).apply {
             this.hint = hint
             setTextColor(white)
-            setHintTextColor(Color.GRAY)
-            textSize = 16f
+            setHintTextColor(muted)
+            textSize = 17f
             setSingleLine(true)
         }
 
@@ -381,56 +491,38 @@ class TelegramAccountsActivity : Activity() {
             .setTitle(title)
             .setView(input)
             .setNegativeButton("لغو", null)
-            .setPositiveButton("ارسال") { _, _ ->
+            .setPositiveButton("تأیید") { _, _ ->
                 val value = input.text.toString().trim()
-
-                if (value.isNotBlank()) {
-                    callback(value)
-                }
+                if (value.isNotBlank()) callback(value)
             }
             .show()
     }
 
-    private fun addText(
-        value: String,
-        size: Float,
-        color: Int,
-        bold: Boolean = false
-    ) {
-        val view = TextView(this).apply {
-            text = value
-            textSize = size
-            setTextColor(color)
-            gravity = Gravity.CENTER
+    // تنظیمات پاسخ‌گویی
 
-            if (bold) {
-                setTypeface(
-                    null,
-                    android.graphics.Typeface.BOLD
-                )
+    private fun showReplySettings(id: String) {
+        val choices = arrayOf(
+            "جدی و طبیعی",
+            "رسمی",
+            "دوستانه",
+            "کوتاه و مستقیم"
+        )
+
+        AlertDialog.Builder(this)
+            .setTitle("انتخاب لحن پاسخ")
+            .setItems(choices) { _, which ->
+                Toast.makeText(
+                    this,
+                    "لحن انتخاب‌شده: ${choices[which]}",
+                    Toast.LENGTH_SHORT
+                ).show()
             }
-
-            setPadding(0, 12, 0, 12)
-        }
-
-        root.addView(view)
-    }
-
-    private fun makeButton(title: String): Button {
-        return Button(this).apply {
-            text = title
-            setTextColor(Color.BLACK)
-            setBackgroundColor(green)
-            textSize = 14f
-        }
+            .setNegativeButton("بستن", null)
+            .show()
     }
 
     override fun onDestroy() {
         uiScope.cancel()
-
-        // مدیر تلگرام را اینجا dispose نمی‌کنیم.
-        // نشست‌ها باید باقی بمانند.
-
         super.onDestroy()
     }
 }
