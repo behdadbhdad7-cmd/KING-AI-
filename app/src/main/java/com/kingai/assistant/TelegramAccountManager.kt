@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collect
 import org.drinkless.tdlib.TdApi
 import java.io.File
 
@@ -62,11 +63,10 @@ class TelegramAccountManager private constructor(context: Context) {
         Context.MODE_PRIVATE
     )
 
-    private val autoReplyPreferences =
-        appContext.getSharedPreferences(
-            "telegram_auto_reply",
-            Context.MODE_PRIVATE
-        )
+    private val autoReplyPreferences = appContext.getSharedPreferences(
+        "telegram_auto_reply",
+        Context.MODE_PRIVATE
+    )
 
     private val _accounts = MutableStateFlow(
         mapOf(
@@ -107,18 +107,13 @@ class TelegramAccountManager private constructor(context: Context) {
         }
     }
 
-    private fun addIncomingMessage(
-        message: IncomingMessage
-    ) {
-        val current = _messages.value[message.accountId]
-            ?: emptyList()
+    private fun addIncomingMessage(message: IncomingMessage) {
+        val current = _messages.value[message.accountId] ?: emptyList()
 
         if (current.any {
                 it.chatId == message.chatId &&
                 it.messageId == message.messageId
-            }) {
-            return
-        }
+            }) return
 
         val updated = (current + message).takeLast(200)
 
@@ -135,11 +130,7 @@ class TelegramAccountManager private constructor(context: Context) {
         }
     }
 
-    // روشن یا خاموش کردن پاسخ خودکار برای هر حساب
-    fun setAutoReplyEnabled(
-        id: String,
-        enabled: Boolean
-    ) {
+    fun setAutoReplyEnabled(id: String, enabled: Boolean) {
         if (id != ACCOUNT_ONE && id != ACCOUNT_TWO) return
 
         autoReplyPreferences.edit()
@@ -150,10 +141,7 @@ class TelegramAccountManager private constructor(context: Context) {
     fun isAutoReplyEnabled(id: String): Boolean {
         if (id != ACCOUNT_ONE && id != ACCOUNT_TWO) return false
 
-        return autoReplyPreferences.getBoolean(
-            "enabled_$id",
-            true
-        )
+        return autoReplyPreferences.getBoolean("enabled_$id", true)
     }
 
     private fun handleNewMessage(
@@ -162,7 +150,6 @@ class TelegramAccountManager private constructor(context: Context) {
         update: TdApi.UpdateNewMessage
     ) {
         val message = update.message ?: return
-
         if (message.isOutgoing) return
 
         val content = message.content
@@ -173,16 +160,10 @@ class TelegramAccountManager private constructor(context: Context) {
 
         scope.launch {
             try {
-                val result = client.send(
-                    TdApi.GetChat(message.chatId)
-                )
+                val result = client.send(TdApi.GetChat(message.chatId))
 
                 if (result !is TdApi.Chat) return@launch
-
-                // فقط چت خصوصی
-                if (result.type !is TdApi.ChatTypePrivate) {
-                    return@launch
-                }
+                if (result.type !is TdApi.ChatTypePrivate) return@launch
 
                 val sender = result.title
                     .takeIf { it.isNotBlank() }
@@ -190,26 +171,23 @@ class TelegramAccountManager private constructor(context: Context) {
 
                 addIncomingMessage(
                     IncomingMessage(
-                        accountId = accountId,
-                        chatId = message.chatId,
-                        messageId = message.id,
-                        sender = sender,
-                        message = text,
-                        date = message.date
+                        accountId,
+                        message.chatId,
+                        message.id,
+                        sender,
+                        text,
+                        message.date
                     )
                 )
 
-                // پاسخ خودکار
                 sendAutoReply(
-                    client = client,
-                    accountId = accountId,
-                    chatId = message.chatId,
-                    messageId = message.id,
-                    text = text
+                    client,
+                    accountId,
+                    message.chatId,
+                    message.id,
+                    text
                 )
-
             } catch (_: Exception) {
-                // دریافت پیام‌های بعدی ادامه پیدا می‌کند
             }
         }
     }
@@ -226,21 +204,17 @@ class TelegramAccountManager private constructor(context: Context) {
         val chatKey = "${accountId}_$chatId"
 
         synchronized(replyLock) {
-            if (!processingChats.add(chatKey)) {
-                return
-            }
+            if (!processingChats.add(chatKey)) return
         }
 
         try {
             val lastMessageKey = "last_message_$chatKey"
 
-            val previousMessageId =
-                autoReplyPreferences.getLong(
-                    lastMessageKey,
-                    0L
-                )
+            val previousMessageId = autoReplyPreferences.getLong(
+                lastMessageKey,
+                0L
+            )
 
-            // جلوگیری از پاسخ دوباره به همان پیام
             if (messageId <= previousMessageId) return
 
             autoReplyPreferences.edit()
@@ -265,15 +239,18 @@ class TelegramAccountManager private constructor(context: Context) {
             }
 
             val now = System.currentTimeMillis()
-
             val greetingKey = "greeting_$chatKey"
             val offlineKey = "offline_$chatKey"
 
-            val lastGreeting =
-                autoReplyPreferences.getLong(greetingKey, 0L)
+            val lastGreeting = autoReplyPreferences.getLong(
+                greetingKey,
+                0L
+            )
 
-            val lastOffline =
-                autoReplyPreferences.getLong(offlineKey, 0L)
+            val lastOffline = autoReplyPreferences.getLong(
+                offlineKey,
+                0L
+            )
 
             val twelveHours = 12 * 60 * 60 * 1000L
             val sixHours = 6 * 60 * 60 * 1000L
@@ -282,23 +259,14 @@ class TelegramAccountManager private constructor(context: Context) {
             val cooldownKey: String
 
             if (isGreeting) {
-
-                if (now - lastGreeting < twelveHours) {
-                    return
-                }
+                if (now - lastGreeting < twelveHours) return
 
                 reply = "سلام، خوبی؟ چه خبر؟"
                 cooldownKey = greetingKey
-
             } else {
+                if (now - lastOffline < sixHours) return
 
-                if (now - lastOffline < sixHours) {
-                    return
-                }
-
-                reply =
-                    "داداش، فعلاً آنلاین نیستم. آنلاین شدم جوابتو می‌دم."
-
+                reply = "داداش، فعلاً آنلاین نیستم. آنلاین شدم جوابتو می‌دم."
                 cooldownKey = offlineKey
             }
 
@@ -311,7 +279,7 @@ class TelegramAccountManager private constructor(context: Context) {
             val result = client.send(
                 TdApi.SendMessage(
                     chatId,
-                    0L,
+                    null,
                     null,
                     null,
                     null,
@@ -326,7 +294,6 @@ class TelegramAccountManager private constructor(context: Context) {
             }
 
         } catch (_: Exception) {
-            // خطای ارسال نباید برنامه را متوقف کند
         } finally {
             synchronized(replyLock) {
                 processingChats.remove(chatKey)
@@ -376,10 +343,7 @@ class TelegramAccountManager private constructor(context: Context) {
     }
 
     fun startAccount(id: String): Boolean {
-        if (id != ACCOUNT_ONE && id != ACCOUNT_TWO) {
-            return false
-        }
-
+        if (id != ACCOUNT_ONE && id != ACCOUNT_TWO) return false
         if (clients.containsKey(id)) return true
 
         val apiId = BuildConfig.TELEGRAM_API_ID.toIntOrNull()
@@ -427,19 +391,11 @@ class TelegramAccountManager private constructor(context: Context) {
                     client.updates.collect { update ->
                         when (update) {
                             is TdApi.UpdateAuthorizationState -> {
-                                handleAuthorization(
-                                    id,
-                                    client,
-                                    update
-                                )
+                                handleAuthorization(id, client, update)
                             }
 
                             is TdApi.UpdateNewMessage -> {
-                                handleNewMessage(
-                                    id,
-                                    client,
-                                    update
-                                )
+                                handleNewMessage(id, client, update)
                             }
                         }
                     }
@@ -456,7 +412,6 @@ class TelegramAccountManager private constructor(context: Context) {
 
             client.init()
             rememberAccount(id)
-
             true
 
         } catch (e: Exception) {
@@ -464,9 +419,7 @@ class TelegramAccountManager private constructor(context: Context) {
 
             updateAccount(id) {
                 it.copy(
-                    status = "خطا: ${
-                        e.message ?: "اتصال ناموفق"
-                    }"
+                    status = "خطا: ${e.message ?: "اتصال ناموفق"}"
                 )
             }
 
@@ -542,8 +495,7 @@ class TelegramAccountManager private constructor(context: Context) {
                             val fullName = listOf(
                                 me.firstName,
                                 me.lastName
-                            )
-                                .filter { it.isNotBlank() }
+                            ).filter { it.isNotBlank() }
                                 .joinToString(" ")
 
                             updateAccount(id) {
@@ -595,9 +547,7 @@ class TelegramAccountManager private constructor(context: Context) {
             cleanPhone.drop(1).any { !it.isDigit() }
         ) {
             updateAccount(id) {
-                it.copy(
-                    status = "شماره نامعتبر است؛ با کد کشور وارد کن"
-                )
+                it.copy(status = "شماره نامعتبر است؛ با کد کشور وارد کن")
             }
             return
         }
@@ -609,10 +559,7 @@ class TelegramAccountManager private constructor(context: Context) {
         scope.launch {
             try {
                 val result = client.send(
-                    TdApi.SetAuthenticationPhoneNumber(
-                        cleanPhone,
-                        null
-                    )
+                    TdApi.SetAuthenticationPhoneNumber(cleanPhone, null)
                 )
 
                 if (result is TdApi.Error) {
@@ -652,9 +599,7 @@ class TelegramAccountManager private constructor(context: Context) {
                 }
             } catch (e: Exception) {
                 updateAccount(id) {
-                    it.copy(
-                        status = "خطای کد: ${e.message ?: "نامشخص"}"
-                    )
+                    it.copy(status = "خطای کد: ${e.message ?: "نامشخص"}")
                 }
             }
         }
@@ -678,9 +623,7 @@ class TelegramAccountManager private constructor(context: Context) {
                 }
             } catch (e: Exception) {
                 updateAccount(id) {
-                    it.copy(
-                        status = "خطای رمز: ${e.message ?: "نامشخص"}"
-                    )
+                    it.copy(status = "خطای رمز: ${e.message ?: "نامشخص"}")
                 }
             }
         }
@@ -704,9 +647,132 @@ class TelegramAccountManager private constructor(context: Context) {
                 }
             } catch (e: Exception) {
                 updateAccount(id) {
+                    it.copy(status = "خطای ایمیل: ${e.message ?: "نامشخص"}")
+                }
+            }
+        }
+    }
+
+    fun submitEmailCode(id: String, code: String) {
+        val client = clients[id] ?: return
+
+        scope.launch {
+            try {
+                val result = client.send(
+                    TdApi.CheckAuthenticationEmailCode(
+                        TdApi.EmailAddressAuthenticationCode(code.trim())
+                    )
+                )
+
+                if (result is TdApi.Error) {
+                    updateAccount(id) {
+                        it.copy(
+                            status = "خطای کد ایمیل ${result.code}: ${result.message}"
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                updateAccount(id) {
                     it.copy(
-                        status = "خطای ایمیل: ${e.message ?: "نامشخص"}"
+                        status = "خطای کد ایمیل: ${e.message ?: "نامشخص"}"
                     )
                 }
             }
-      
+        }
+    }
+
+    fun closeAccount(id: String) {
+        if (id != ACCOUNT_ONE && id != ACCOUNT_TWO) return
+
+        clients.remove(id)?.let {
+            try {
+                it.close()
+            } catch (_: Exception) {
+            }
+        }
+
+        updateAccount(id) {
+            it.copy(
+                status = "اتصال قطع شد؛ نشست ذخیره است",
+                authorized = false
+            )
+        }
+    }
+
+    fun logoutAccount(id: String) {
+        if (id != ACCOUNT_ONE && id != ACCOUNT_TWO) return
+
+        val client = clients[id]
+
+        scope.launch {
+            try {
+                client?.send(TdApi.LogOut())
+            } catch (_: Exception) {
+            }
+
+            clients.remove(id)?.let {
+                try {
+                    it.close()
+                } catch (_: Exception) {
+                }
+            }
+
+            forgetAccount(id)
+            clearMessages(id)
+
+            updateAccount(id) {
+                AccountInfo(id).copy(status = "از تلگرام خارج شد")
+            }
+        }
+    }
+
+    fun removeAccount(id: String) {
+        if (id != ACCOUNT_ONE && id != ACCOUNT_TWO) return
+
+        forgetAccount(id)
+
+        val client = clients[id]
+
+        scope.launch {
+            try {
+                client?.send(TdApi.LogOut())
+            } catch (_: Exception) {
+            }
+
+            clients.remove(id)?.let {
+                try {
+                    it.close()
+                } catch (_: Exception) {
+                }
+            }
+
+            val directory = File(
+                appContext.filesDir,
+                "telegram_accounts/$id"
+            )
+
+            try {
+                directory.deleteRecursively()
+            } catch (_: Exception) {
+            }
+
+            clearMessages(id)
+
+            updateAccount(id) {
+                AccountInfo(id)
+            }
+        }
+    }
+
+    fun dispose() {
+        clients.values.toList().forEach {
+            try {
+                it.close()
+            } catch (_: Exception) {
+            }
+        }
+
+        clients.clear()
+        scope.cancel()
+    }
+}
