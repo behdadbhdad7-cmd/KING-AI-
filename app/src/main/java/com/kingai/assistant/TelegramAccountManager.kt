@@ -1,4 +1,3 @@
-
 package com.kingai.assistant
 
 import android.content.Context
@@ -40,6 +39,16 @@ class TelegramAccountManager private constructor(context: Context) {
         val authorized: Boolean = false
     )
 
+    // اطلاعات پیام دریافتی
+    data class IncomingMessage(
+        val accountId: String,
+        val chatId: Long,
+        val messageId: Long,
+        val sender: String,
+        val message: String,
+        val date: Int
+    )
+
     private val appContext = context.applicationContext
 
     private val scope = CoroutineScope(
@@ -63,6 +72,18 @@ class TelegramAccountManager private constructor(context: Context) {
     val accounts: StateFlow<Map<String, AccountInfo>> =
         _accounts.asStateFlow()
 
+    // پیام‌های هر حساب جدا از حساب دیگر نگهداری می‌شوند
+    private val _messages =
+        MutableStateFlow<Map<String, List<IncomingMessage>>>(
+            mapOf(
+                ACCOUNT_ONE to emptyList(),
+                ACCOUNT_TWO to emptyList()
+            )
+        )
+
+    val messages: StateFlow<Map<String, List<IncomingMessage>>> =
+        _messages.asStateFlow()
+
     init {
         restoreSavedAccounts()
     }
@@ -75,6 +96,85 @@ class TelegramAccountManager private constructor(context: Context) {
 
         _accounts.value = _accounts.value.toMutableMap().apply {
             put(id, transform(current))
+        }
+    }
+
+    private fun addIncomingMessage(
+        message: IncomingMessage
+    ) {
+        val current = _messages.value[message.accountId]
+            ?: emptyList()
+
+        // جلوگیری از ذخیره پیام تکراری
+        if (current.any {
+                it.chatId == message.chatId &&
+                it.messageId == message.messageId
+            }) {
+            return
+        }
+
+        val updated = (current + message).takeLast(200)
+
+        _messages.value = _messages.value.toMutableMap().apply {
+            put(message.accountId, updated)
+        }
+    }
+
+    fun clearMessages(id: String) {
+        if (id != ACCOUNT_ONE && id != ACCOUNT_TWO) return
+
+        _messages.value = _messages.value.toMutableMap().apply {
+            put(id, emptyList())
+        }
+    }
+
+    private fun handleNewMessage(
+        accountId: String,
+        client: TdClient,
+        update: TdApi.UpdateNewMessage
+    ) {
+        val message = update.message ?: return
+
+        // پیام‌های ارسالی خود حساب را نادیده بگیر
+        if (message.isOutgoing) return
+
+        // فقط پیام متنی
+        val content = message.content
+        if (content !is TdApi.MessageText) return
+
+        val text = content.text?.text?.trim().orEmpty()
+        if (text.isBlank()) return
+
+        scope.launch {
+            try {
+                // فقط گفت‌وگوی خصوصی؛ گروه و کانال حذف می‌شوند
+                val result = client.send(
+                    TdApi.GetChat(message.chatId)
+                )
+
+                if (result !is TdApi.Chat) return@launch
+                if (result.type !is TdApi.ChatTypePrivate) {
+                    return@launch
+                }
+
+                val sender = result.title
+                    .takeIf { it.isNotBlank() }
+                    ?: "مخاطب تلگرام"
+
+                addIncomingMessage(
+                    IncomingMessage(
+                        accountId = accountId,
+                        chatId = message.chatId,
+                        messageId = message.id,
+                        sender = sender,
+                        message = text,
+                        date = message.date
+                    )
+                )
+
+            } catch (_: Exception) {
+                // خطای یک پیام نباید دریافت پیام‌های بعدی را متوقف کند
+            }
         }
     }
 
@@ -169,18 +269,28 @@ class TelegramAccountManager private constructor(context: Context) {
             scope.launch {
                 try {
                     client.updates.collect { update ->
-                        if (update is TdApi.UpdateAuthorizationState) {
-                            handleAuthorization(
-                                id,
-                                client,
-                                update
-                            )
+                        when (update) {
+                            is TdApi.UpdateAuthorizationState -> {
+                                handleAuthorization(
+                                    id,
+                                    client,
+                                    update
+                                )
+                            }
+
+                            is TdApi.UpdateNewMessage -> {
+                                handleNewMessage(
+                                    id,
+                                    client,
+                                    update
+                                )
+                            }
                         }
                     }
                 } catch (e: Exception) {
                     updateAccount(id) {
                         it.copy(
-                            status = "خطا در دریافت وضعیت: ${
+                            status = "خطا در دریافت اطلاعات: ${
                                 e.message ?: "نامشخص"
                             }"
                         )
@@ -511,6 +621,7 @@ class TelegramAccountManager private constructor(context: Context) {
             }
 
             forgetAccount(id)
+            clearMessages(id)
 
             updateAccount(id) {
                 AccountInfo(id).copy(
@@ -549,6 +660,8 @@ class TelegramAccountManager private constructor(context: Context) {
                 directory.deleteRecursively()
             } catch (_: Exception) {
             }
+
+            clearMessages(id)
 
             updateAccount(id) {
                 AccountInfo(id)
