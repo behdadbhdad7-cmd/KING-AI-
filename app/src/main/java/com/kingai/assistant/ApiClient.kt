@@ -1,6 +1,7 @@
 
 package com.kingai.assistant
 
+import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import org.json.JSONArray
@@ -21,13 +22,36 @@ object ApiClient {
     private val executor = Executors.newFixedThreadPool(2)
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    private val systemPrompt = """
+        تو KING AI هستی؛ یک دستیار هوشمند حرفه‌ای.
+
+        شخصیت و رفتار:
+        - فارسی را طبیعی، روان و محاوره‌ای صحبت کن.
+        - منظور واقعی کاربر را درک کن، نه فقط کلمات او را.
+        - قبل از پاسخ، موضوع را تحلیل کن.
+        - پاسخ دقیق، مفید و متناسب با سؤال ارائه بده.
+        - در موضوعات پیچیده، مرحله‌به‌مرحله توضیح بده.
+        - اگر اطلاعات کافی نداری، سؤال روشن‌کننده بپرس.
+        - اگر پاسخ را نمی‌دانی، صادقانه بگو.
+        - از جواب‌های کلیشه‌ای و تکراری خودداری کن.
+        - لحن دوستانه، جدی، باهوش و محترمانه داشته باش.
+        - خودت را یک دستیار هوشمند معرفی کن.
+        - از ایموجی و استیکر استفاده نکن.
+        - اطلاعات ساختگی تولید نکن.
+        - پاسخ را متناسب با نیاز کاربر بنویس.
+
+        اگر کاربر فارسی صحبت کرد، فارسی جواب بده.
+        هدف تو کمک واقعی و دقیق به کاربر است.
+    """.trimIndent()
+
     fun sendMessage(
-        context: android.content.Context,
+        context: Context,
         message: String,
         callback: (ApiResult) -> Unit
     ) {
         executor.execute {
             val result = request(context, message)
+
             mainHandler.post {
                 callback(result)
             }
@@ -35,7 +59,7 @@ object ApiClient {
     }
 
     private fun request(
-        context: android.content.Context,
+        context: Context,
         message: String
     ): ApiResult {
 
@@ -46,7 +70,10 @@ object ApiClient {
         }
 
         val token = rawToken.trim()
-            .removePrefix("Bearer ")
+            .replace(
+                Regex("^Bearer\\s+", RegexOption.IGNORE_CASE),
+                ""
+            )
             .trim()
 
         val baseUrl = ApiConfig.getBaseUrl(context)
@@ -60,11 +87,17 @@ object ApiClient {
         }
 
         if (baseUrl.isBlank() || model.isBlank()) {
-            return ApiResult(false, "آدرس سرویس یا نام مدل تنظیم نشده است.")
+            return ApiResult(
+                false,
+                "آدرس سرویس یا نام مدل تنظیم نشده است."
+            )
         }
 
         if (!baseUrl.startsWith("https://", true)) {
-            return ApiResult(false, "آدرس سرویس باید HTTPS باشد.")
+            return ApiResult(
+                false,
+                "آدرس سرویس باید HTTPS باشد."
+            )
         }
 
         val endpoint = when {
@@ -81,6 +114,55 @@ object ApiClient {
                 "$baseUrl/v1/chat/completions"
         }
 
+        var lastResult = ApiResult(
+            false,
+            "ارتباط با سرویس برقرار نشد."
+        )
+
+        for (attempt in 0..2) {
+
+            lastResult = performRequest(
+                endpoint,
+                token,
+                model,
+                message
+            )
+
+            if (lastResult.success) {
+                return lastResult
+            }
+
+            val temporaryError =
+                lastResult.message.contains("503") ||
+                lastResult.message.contains("502") ||
+                lastResult.message.contains("504") ||
+                lastResult.message.contains("429")
+
+            if (!temporaryError || attempt == 2) {
+                return lastResult
+            }
+
+            try {
+                Thread.sleep(1000L * (attempt + 1))
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return ApiResult(
+                    false,
+                    "درخواست متوقف شد."
+                )
+            }
+        }
+
+        return lastResult
+    }
+
+    private fun performRequest(
+        endpoint: String,
+        token: String,
+        model: String,
+        message: String
+    ): ApiResult {
+
         var connection: HttpURLConnection? = null
 
         return try {
@@ -89,8 +171,8 @@ object ApiClient {
                 as HttpURLConnection
 
             connection.requestMethod = "POST"
-            connection.connectTimeout = 20000
-            connection.readTimeout = 60000
+            connection.connectTimeout = 15000
+            connection.readTimeout = 45000
             connection.doOutput = true
 
             connection.setRequestProperty(
@@ -100,7 +182,7 @@ object ApiClient {
 
             connection.setRequestProperty(
                 "Content-Type",
-                "application/json"
+                "application/json; charset=UTF-8"
             )
 
             connection.setRequestProperty(
@@ -108,19 +190,23 @@ object ApiClient {
                 "application/json"
             )
 
-            val body = JSONObject().apply {
-                put("model", model)
-
-                put(
-                    "messages",
-                    JSONArray().put(
-                        JSONObject().apply {
-                            put("role", "user")
-                            put("content", message)
-                        }
-                    )
+            val messages = JSONArray()
+                .put(
+                    JSONObject().apply {
+                        put("role", "system")
+                        put("content", systemPrompt)
+                    }
+                )
+                .put(
+                    JSONObject().apply {
+                        put("role", "user")
+                        put("content", message)
+                    }
                 )
 
+            val body = JSONObject().apply {
+                put("model", model)
+                put("messages", messages)
                 put("stream", false)
             }
 
@@ -158,13 +244,19 @@ object ApiClient {
                 return ApiResult(
                     false,
                     when (status) {
-                        400 -> "درخواست نامعتبر: ${detail.take(300)}"
-                        401 -> "کلید API نامعتبر است (401): ${detail.take(300)}"
-                        403 -> "دسترسی به سرویس ممنوع است (403): ${detail.take(300)}"
-                        404 -> "مدل یا مسیر پیدا نشد (404): ${detail.take(300)}"
-                        429 -> "سهمیه رایگان یا محدودیت درخواست تمام شده (429): ${detail.take(300)}"
-                        in 500..599 -> "خطای سرور ($status): ${detail.take(300)}"
-                        else -> "خطای HTTP $status: ${detail.take(300)}"
+                        400 -> "درخواست نامعتبر: ${detail.take(250)}"
+                        401 -> "کلید API نامعتبر است (401)."
+                        403 -> "دسترسی به سرویس ممنوع است (403)."
+                        404 -> "مدل یا مسیر پیدا نشد (404)."
+                        429 -> "محدودیت سهمیه یا درخواست (429)."
+                        500 -> "خطای داخلی سرور (500)."
+                        502 -> "سرور موقتاً در دسترس نیست (502)."
+                        503 -> "سرور Gemini موقتاً مشغول است (503)."
+                        504 -> "زمان پاسخ سرور تمام شد (504)."
+                        in 500..599 ->
+                            "خطای سرور ($status): ${detail.take(200)}"
+                        else ->
+                            "خطای HTTP $status: ${detail.take(200)}"
                     }
                 )
             }
@@ -178,7 +270,10 @@ object ApiClient {
                 )
 
             if (choices.length() == 0) {
-                return ApiResult(false, "سرویس پاسخ خالی برگرداند.")
+                return ApiResult(
+                    false,
+                    "سرویس پاسخ خالی برگرداند."
+                )
             }
 
             val content = choices
@@ -208,15 +303,24 @@ object ApiClient {
             }
 
             if (answer.isBlank()) {
-                ApiResult(false, "پاسخ متنی دریافت نشد.")
+                ApiResult(
+                    false,
+                    "پاسخ متنی دریافت نشد."
+                )
             } else {
-                ApiResult(true, answer)
+                ApiResult(true, answer.trim())
             }
 
         } catch (_: SocketTimeoutException) {
-            ApiResult(false, "زمان اتصال تمام شد؛ دوباره تلاش کن.")
+            ApiResult(
+                false,
+                "زمان اتصال تمام شد؛ دوباره تلاش کن."
+            )
         } catch (_: UnknownHostException) {
-            ApiResult(false, "اینترنت یا آدرس سرور در دسترس نیست.")
+            ApiResult(
+                false,
+                "اینترنت یا آدرس سرور در دسترس نیست."
+            )
         } catch (e: Exception) {
             ApiResult(
                 false,
