@@ -1,20 +1,32 @@
-
 package com.kingai.assistant
 
 import android.os.Bundle
 import android.graphics.Color
+import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.ComponentActivity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 
 class TelegramInboxActivity : ComponentActivity() {
 
     private lateinit var list: LinearLayout
+    private lateinit var manager: TelegramAccountManager
+
+    private val screenScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Main
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        manager = TelegramAccountManager.get(this)
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -31,7 +43,7 @@ class TelegramInboxActivity : ComponentActivity() {
         root.addView(title)
 
         val info = TextView(this).apply {
-            text = "پیام‌های دریافتی از اعلان‌های تلگرام"
+            text = "پیام‌های خصوصی دریافتی از حساب‌های متصل"
             textSize = 13f
             setTextColor(Color.LTGRAY)
             setPadding(0, dp(8), 0, dp(16))
@@ -40,6 +52,7 @@ class TelegramInboxActivity : ComponentActivity() {
         root.addView(info)
 
         val scroll = ScrollView(this)
+
         list = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
@@ -51,65 +64,113 @@ class TelegramInboxActivity : ComponentActivity() {
             LinearLayout.LayoutParams(-1, 0, 1f)
         )
 
-        val refresh = NeonButton(this, "به‌روزرسانی پیام‌ها", true)
-        refresh.setOnClickListener { loadMessages() }
+        val refresh = NeonButton(
+            this,
+            "به‌روزرسانی پیام‌ها",
+            true
+        )
+
+        refresh.setOnClickListener {
+            renderMessages(manager.messages.value)
+        }
+
         root.addView(refresh)
 
         setContentView(root)
-        loadMessages()
+
+        screenScope.launch {
+            manager.messages.collect { messages ->
+                renderMessages(messages)
+            }
+        }
     }
 
-    private fun loadMessages() {
+    private fun renderMessages(
+        allMessages: Map<String, List<TelegramAccountManager.IncomingMessage>>
+    ) {
         list.removeAllViews()
 
-        val prefs = getSharedPreferences(
-            TelegramNotificationListener.PREFS,
-            MODE_PRIVATE
-        )
+        val messages = allMessages.values
+            .flatten()
+            .sortedByDescending { it.date }
 
-        val raw = prefs.getString("messages", "[]") ?: "[]"
+        if (messages.isEmpty()) {
+            addText("هنوز پیام جدیدی دریافت نشده است.")
+            return
+        }
 
-        try {
-            val array = JSONArray(raw)
+        messages.forEach { item ->
 
-            if (array.length() == 0) {
-                addText("هنوز پیام تلگرامی دریافت نشده است.")
-                return
+            val accountName = when (item.accountId) {
+                TelegramAccountManager.ACCOUNT_ONE -> "حساب اول"
+                TelegramAccountManager.ACCOUNT_TWO -> "حساب دوم"
+                else -> "حساب تلگرام"
             }
 
-            for (i in array.length() - 1 downTo 0) {
-                val item = array.getJSONObject(i)
-
-                val sender = item.optString(
-                    "sender",
-                    "مخاطب تلگرام"
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(
+                    dp(14),
+                    dp(14),
+                    dp(14),
+                    dp(14)
                 )
-
-                val message = item.optString("message", "")
-
-                addText("فرستنده: $sender\n\n$message")
+                setBackgroundColor(Color.rgb(25, 35, 30))
             }
 
-        } catch (_: Exception) {
-            addText("خطا در خواندن پیام‌ها.")
+            val account = TextView(this).apply {
+                text = accountName
+                textSize = 12f
+                setTextColor(Neon.GREEN)
+            }
+
+            val sender = TextView(this).apply {
+                text = item.sender
+                textSize = 16f
+                setTextColor(Color.WHITE)
+                setPadding(0, dp(8), 0, dp(8))
+            }
+
+            val message = TextView(this).apply {
+                text = item.message
+                textSize = 15f
+                setTextColor(Color.LTGRAY)
+            }
+
+            card.addView(account)
+            card.addView(sender)
+            card.addView(message)
+
+            val params = LinearLayout.LayoutParams(-1, -2)
+            params.bottomMargin = dp(10)
+
+            list.addView(card, params)
         }
     }
 
     private fun addText(value: String) {
-        val card = TextView(this).apply {
-            text = value
+        val text = TextView(this).apply {
+            this.text = value
             textSize = 15f
-            setTextColor(Color.WHITE)
-            setPadding(dp(14), dp(14), dp(14), dp(14))
-            setBackgroundColor(Color.rgb(25, 35, 30))
+            gravity = Gravity.CENTER
+            setTextColor(Color.LTGRAY)
+            setPadding(dp(14), dp(24), dp(14), dp(24))
         }
 
-        val params = LinearLayout.LayoutParams(-1, -2)
-        params.bottomMargin = dp(10)
-        list.addView(card, params)
+        list.addView(
+            text,
+            LinearLayout.LayoutParams(-1, -2)
+        )
     }
 
     private fun dp(value: Int): Int {
-        return (value * resources.displayMetrics.density).toInt()
+        return (
+            value * resources.displayMetrics.density
+        ).toInt()
+    }
+
+    override fun onDestroy() {
+        screenScope.cancel()
+        super.onDestroy()
     }
 }
