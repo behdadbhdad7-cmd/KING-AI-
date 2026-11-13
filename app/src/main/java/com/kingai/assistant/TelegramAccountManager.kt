@@ -1,3 +1,4 @@
+
 package com.kingai.assistant
 
 import android.content.Context
@@ -39,7 +40,6 @@ class TelegramAccountManager private constructor(context: Context) {
         val authorized: Boolean = false
     )
 
-    // اطلاعات پیام دریافتی
     data class IncomingMessage(
         val accountId: String,
         val chatId: Long,
@@ -62,6 +62,12 @@ class TelegramAccountManager private constructor(context: Context) {
         Context.MODE_PRIVATE
     )
 
+    private val autoReplyPreferences =
+        appContext.getSharedPreferences(
+            "telegram_auto_reply",
+            Context.MODE_PRIVATE
+        )
+
     private val _accounts = MutableStateFlow(
         mapOf(
             ACCOUNT_ONE to AccountInfo(ACCOUNT_ONE),
@@ -72,7 +78,6 @@ class TelegramAccountManager private constructor(context: Context) {
     val accounts: StateFlow<Map<String, AccountInfo>> =
         _accounts.asStateFlow()
 
-    // پیام‌های هر حساب جدا از حساب دیگر نگهداری می‌شوند
     private val _messages =
         MutableStateFlow<Map<String, List<IncomingMessage>>>(
             mapOf(
@@ -83,6 +88,9 @@ class TelegramAccountManager private constructor(context: Context) {
 
     val messages: StateFlow<Map<String, List<IncomingMessage>>> =
         _messages.asStateFlow()
+
+    private val replyLock = Any()
+    private val processingChats = mutableSetOf<String>()
 
     init {
         restoreSavedAccounts()
@@ -105,7 +113,6 @@ class TelegramAccountManager private constructor(context: Context) {
         val current = _messages.value[message.accountId]
             ?: emptyList()
 
-        // جلوگیری از ذخیره پیام تکراری
         if (current.any {
                 it.chatId == message.chatId &&
                 it.messageId == message.messageId
@@ -128,6 +135,27 @@ class TelegramAccountManager private constructor(context: Context) {
         }
     }
 
+    // روشن یا خاموش کردن پاسخ خودکار برای هر حساب
+    fun setAutoReplyEnabled(
+        id: String,
+        enabled: Boolean
+    ) {
+        if (id != ACCOUNT_ONE && id != ACCOUNT_TWO) return
+
+        autoReplyPreferences.edit()
+            .putBoolean("enabled_$id", enabled)
+            .apply()
+    }
+
+    fun isAutoReplyEnabled(id: String): Boolean {
+        if (id != ACCOUNT_ONE && id != ACCOUNT_TWO) return false
+
+        return autoReplyPreferences.getBoolean(
+            "enabled_$id",
+            true
+        )
+    }
+
     private fun handleNewMessage(
         accountId: String,
         client: TdClient,
@@ -135,10 +163,8 @@ class TelegramAccountManager private constructor(context: Context) {
     ) {
         val message = update.message ?: return
 
-        // پیام‌های ارسالی خود حساب را نادیده بگیر
         if (message.isOutgoing) return
 
-        // فقط پیام متنی
         val content = message.content
         if (content !is TdApi.MessageText) return
 
@@ -147,12 +173,13 @@ class TelegramAccountManager private constructor(context: Context) {
 
         scope.launch {
             try {
-                // فقط گفت‌وگوی خصوصی؛ گروه و کانال حذف می‌شوند
                 val result = client.send(
                     TdApi.GetChat(message.chatId)
                 )
 
                 if (result !is TdApi.Chat) return@launch
+
+                // فقط چت خصوصی
                 if (result.type !is TdApi.ChatTypePrivate) {
                     return@launch
                 }
@@ -172,8 +199,137 @@ class TelegramAccountManager private constructor(context: Context) {
                     )
                 )
 
+                // پاسخ خودکار
+                sendAutoReply(
+                    client = client,
+                    accountId = accountId,
+                    chatId = message.chatId,
+                    messageId = message.id,
+                    text = text
+                )
+
             } catch (_: Exception) {
-                // خطای یک پیام نباید دریافت پیام‌های بعدی را متوقف کند
+                // دریافت پیام‌های بعدی ادامه پیدا می‌کند
+            }
+        }
+    }
+
+    private suspend fun sendAutoReply(
+        client: TdClient,
+        accountId: String,
+        chatId: Long,
+        messageId: Long,
+        text: String
+    ) {
+        if (!isAutoReplyEnabled(accountId)) return
+
+        val chatKey = "${accountId}_$chatId"
+
+        synchronized(replyLock) {
+            if (!processingChats.add(chatKey)) {
+                return
+            }
+        }
+
+        try {
+            val lastMessageKey = "last_message_$chatKey"
+
+            val previousMessageId =
+                autoReplyPreferences.getLong(
+                    lastMessageKey,
+                    0L
+                )
+
+            // جلوگیری از پاسخ دوباره به همان پیام
+            if (messageId <= previousMessageId) return
+
+            autoReplyPreferences.edit()
+                .putLong(lastMessageKey, messageId)
+                .apply()
+
+            val normalized = text.trim().lowercase()
+
+            val greetings = listOf(
+                "سلام",
+                "درود",
+                "hello",
+                "hi",
+                "hey"
+            )
+
+            val isGreeting = greetings.any { greeting ->
+                normalized == greeting ||
+                normalized.startsWith("$greeting ") ||
+                normalized.startsWith("$greeting،") ||
+                normalized.startsWith("$greeting,")
+            }
+
+            val now = System.currentTimeMillis()
+
+            val greetingKey = "greeting_$chatKey"
+            val offlineKey = "offline_$chatKey"
+
+            val lastGreeting =
+                autoReplyPreferences.getLong(greetingKey, 0L)
+
+            val lastOffline =
+                autoReplyPreferences.getLong(offlineKey, 0L)
+
+            val twelveHours = 12 * 60 * 60 * 1000L
+            val sixHours = 6 * 60 * 60 * 1000L
+
+            val reply: String
+            val cooldownKey: String
+
+            if (isGreeting) {
+
+                if (now - lastGreeting < twelveHours) {
+                    return
+                }
+
+                reply = "سلام، خوبی؟ چه خبر؟"
+                cooldownKey = greetingKey
+
+            } else {
+
+                if (now - lastOffline < sixHours) {
+                    return
+                }
+
+                reply =
+                    "داداش، فعلاً آنلاین نیستم. آنلاین شدم جوابتو می‌دم."
+
+                cooldownKey = offlineKey
+            }
+
+            val inputContent = TdApi.InputMessageText(
+                TdApi.FormattedText(reply, null),
+                null,
+                true
+            )
+
+            val result = client.send(
+                TdApi.SendMessage(
+                    chatId,
+                    0L,
+                    null,
+                    null,
+                    null,
+                    inputContent
+                )
+            )
+
+            if (result is TdApi.Message) {
+                autoReplyPreferences.edit()
+                    .putLong(cooldownKey, now)
+                    .apply()
+            }
+
+        } catch (_: Exception) {
+            // خطای ارسال نباید برنامه را متوقف کند
+        } finally {
+            synchronized(replyLock) {
+                processingChats.remove(chatKey)
             }
         }
     }
@@ -553,131 +709,4 @@ class TelegramAccountManager private constructor(context: Context) {
                     )
                 }
             }
-        }
-    }
-
-    fun submitEmailCode(id: String, code: String) {
-        val client = clients[id] ?: return
-
-        scope.launch {
-            try {
-                val result = client.send(
-                    TdApi.CheckAuthenticationEmailCode(
-                        TdApi.EmailAddressAuthenticationCode(
-                            code.trim()
-                        )
-                    )
-                )
-
-                if (result is TdApi.Error) {
-                    updateAccount(id) {
-                        it.copy(
-                            status = "خطای کد ایمیل ${result.code}: ${result.message}"
-                        )
-                    }
-                }
-            } catch (e: Exception) {
-                updateAccount(id) {
-                    it.copy(
-                        status = "خطای کد ایمیل: ${e.message ?: "نامشخص"}"
-                    )
-                }
-            }
-        }
-    }
-
-    fun closeAccount(id: String) {
-        clients.remove(id)?.let {
-            try {
-                it.close()
-            } catch (_: Exception) {
-            }
-        }
-
-        updateAccount(id) {
-            it.copy(
-                status = "اتصال قطع شد؛ نشست ذخیره است",
-                authorized = false
-            )
-        }
-    }
-
-    fun logoutAccount(id: String) {
-        if (id != ACCOUNT_ONE && id != ACCOUNT_TWO) return
-
-        val client = clients[id]
-
-        scope.launch {
-            try {
-                client?.send(TdApi.LogOut())
-            } catch (_: Exception) {
-            }
-
-            clients.remove(id)?.let {
-                try {
-                    it.close()
-                } catch (_: Exception) {
-                }
-            }
-
-            forgetAccount(id)
-            clearMessages(id)
-
-            updateAccount(id) {
-                AccountInfo(id).copy(
-                    status = "از تلگرام خارج شد"
-                )
-            }
-        }
-    }
-
-    fun removeAccount(id: String) {
-        if (id != ACCOUNT_ONE && id != ACCOUNT_TWO) return
-
-        forgetAccount(id)
-
-        val client = clients[id]
-
-        scope.launch {
-            try {
-                client?.send(TdApi.LogOut())
-            } catch (_: Exception) {
-            }
-
-            clients.remove(id)?.let {
-                try {
-                    it.close()
-                } catch (_: Exception) {
-                }
-            }
-
-            val directory = File(
-                appContext.filesDir,
-                "telegram_accounts/$id"
-            )
-
-            try {
-                directory.deleteRecursively()
-            } catch (_: Exception) {
-            }
-
-            clearMessages(id)
-
-            updateAccount(id) {
-                AccountInfo(id)
-            }
-        }
-    }
-
-    fun dispose() {
-        clients.values.toList().forEach {
-            try {
-                it.close()
-            } catch (_: Exception) {
-            }
-        }
-
-        clients.clear()
-        scope.cancel()
-    }
-}
+      
