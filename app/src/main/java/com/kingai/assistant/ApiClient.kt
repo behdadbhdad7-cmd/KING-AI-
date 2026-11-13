@@ -7,9 +7,9 @@ import android.os.Looper
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
-import java.net.URL
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
+import java.net.URL
 import java.util.concurrent.Executors
 
 object ApiClient {
@@ -24,24 +24,12 @@ object ApiClient {
 
     private val systemPrompt = """
         تو KING AI هستی؛ یک دستیار هوشمند حرفه‌ای.
-
-        شخصیت و رفتار:
-        - فارسی را طبیعی، روان و محاوره‌ای صحبت کن.
-        - منظور واقعی کاربر را درک کن، نه فقط کلمات او را.
-        - قبل از پاسخ، موضوع را تحلیل کن.
-        - پاسخ دقیق، مفید و متناسب با سؤال ارائه بده.
-        - در موضوعات پیچیده، مرحله‌به‌مرحله توضیح بده.
-        - اگر اطلاعات کافی نداری، سؤال روشن‌کننده بپرس.
-        - اگر پاسخ را نمی‌دانی، صادقانه بگو.
-        - از جواب‌های کلیشه‌ای و تکراری خودداری کن.
-        - لحن دوستانه، جدی، باهوش و محترمانه داشته باش.
-        - خودت را یک دستیار هوشمند معرفی کن.
-        - از ایموجی و استیکر استفاده نکن.
-        - اطلاعات ساختگی تولید نکن.
-        - پاسخ را متناسب با نیاز کاربر بنویس.
-
-        اگر کاربر فارسی صحبت کرد، فارسی جواب بده.
-        هدف تو کمک واقعی و دقیق به کاربر است.
+        فارسی را طبیعی، روان و محاوره‌ای صحبت کن.
+        پاسخ‌ها دقیق، مفید، دوستانه و جدی باشند.
+        از ایموجی و استیکر استفاده نکن.
+        اطلاعات ساختگی نده.
+        سؤال ساده را کوتاه و سؤال پیچیده را مرحله‌به‌مرحله جواب بده.
+        اگر اطلاعات کافی نداری، سؤال روشن‌کننده بپرس.
     """.trimIndent()
 
     fun sendMessage(
@@ -87,17 +75,11 @@ object ApiClient {
         }
 
         if (baseUrl.isBlank() || model.isBlank()) {
-            return ApiResult(
-                false,
-                "آدرس سرویس یا نام مدل تنظیم نشده است."
-            )
+            return ApiResult(false, "آدرس سرویس یا نام مدل تنظیم نشده است.")
         }
 
         if (!baseUrl.startsWith("https://", true)) {
-            return ApiResult(
-                false,
-                "آدرس سرویس باید HTTPS باشد."
-            )
+            return ApiResult(false, "آدرس سرویس باید HTTPS باشد.")
         }
 
         val endpoint = when {
@@ -114,46 +96,12 @@ object ApiClient {
                 "$baseUrl/v1/chat/completions"
         }
 
-        var lastResult = ApiResult(
-            false,
-            "ارتباط با سرویس برقرار نشد."
+        return performRequest(
+            endpoint,
+            token,
+            model,
+            message
         )
-
-        for (attempt in 0..2) {
-
-            lastResult = performRequest(
-                endpoint,
-                token,
-                model,
-                message
-            )
-
-            if (lastResult.success) {
-                return lastResult
-            }
-
-            val temporaryError =
-                lastResult.message.contains("503") ||
-                lastResult.message.contains("502") ||
-                lastResult.message.contains("504") ||
-                lastResult.message.contains("429")
-
-            if (!temporaryError || attempt == 2) {
-                return lastResult
-            }
-
-            try {
-                Thread.sleep(1000L * (attempt + 1))
-            } catch (_: InterruptedException) {
-                Thread.currentThread().interrupt()
-                return ApiResult(
-                    false,
-                    "درخواست متوقف شد."
-                )
-            }
-        }
-
-        return lastResult
     }
 
     private fun performRequest(
@@ -171,8 +119,8 @@ object ApiClient {
                 as HttpURLConnection
 
             connection.requestMethod = "POST"
-            connection.connectTimeout = 15000
-            connection.readTimeout = 45000
+            connection.connectTimeout = 10000
+            connection.readTimeout = 30000
             connection.doOutput = true
 
             connection.setRequestProperty(
@@ -207,6 +155,8 @@ object ApiClient {
             val body = JSONObject().apply {
                 put("model", model)
                 put("messages", messages)
+                put("temperature", 0.7)
+                put("max_tokens", 512)
                 put("stream", false)
             }
 
@@ -270,10 +220,7 @@ object ApiClient {
                 )
 
             if (choices.length() == 0) {
-                return ApiResult(
-                    false,
-                    "سرویس پاسخ خالی برگرداند."
-                )
+                return ApiResult(false, "سرویس پاسخ خالی برگرداند.")
             }
 
             val content = choices
@@ -303,10 +250,7 @@ object ApiClient {
             }
 
             if (answer.isBlank()) {
-                ApiResult(
-                    false,
-                    "پاسخ متنی دریافت نشد."
-                )
+                ApiResult(false, "پاسخ متنی دریافت نشد.")
             } else {
                 ApiResult(true, answer.trim())
             }
@@ -314,7 +258,7 @@ object ApiClient {
         } catch (_: SocketTimeoutException) {
             ApiResult(
                 false,
-                "زمان اتصال تمام شد؛ دوباره تلاش کن."
+                "زمان پاسخ تمام شد؛ اینترنت یا سرور کند است."
             )
         } catch (_: UnknownHostException) {
             ApiResult(
