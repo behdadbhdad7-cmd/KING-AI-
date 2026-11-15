@@ -35,23 +35,47 @@ jobs:
         with:
           gradle-version: '8.10.2'
 
-      - name: Build debug APK
+      - name: Build APK
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
         run: gradle assembleDebug --stacktrace
 
-      - name: Verify APK
+      - name: Sign APK with KING AI key
+        env:
+          KING_KEYSTORE_B64: ${{ secrets.KING_KEYSTORE_B64 }}
+          KING_KEYSTORE_PASSWORD: ${{ secrets.KING_KEYSTORE_PASSWORD }}
+          KING_KEY_ALIAS: ${{ secrets.KING_KEY_ALIAS }}
         run: |
-          APK="app/build/outputs/apk/debug/app-debug.apk"
-          test -s "$APK"
-          unzip -t "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
+          set -e
 
-      - name: Upload APK
+          KEYSTORE="$RUNNER_TEMP/king.keystore"
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          ALIGNED="$RUNNER_TEMP/aligned.apk"
+          SIGNED="$RUNNER_TEMP/KING-AI.apk"
+
+          echo "$KING_KEYSTORE_B64" | base64 --decode > "$KEYSTORE"
+
+          test -s "$KEYSTORE"
+          test -s "$APK"
+
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" \
+            -f 4 "$APK" "$ALIGNED"
+
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign \
+            --ks "$KEYSTORE" \
+            --ks-key-alias "$KING_KEY_ALIAS" \
+            --ks-pass env:KING_KEYSTORE_PASSWORD \
+            --key-pass env:KING_KEYSTORE_PASSWORD \
+            --out "$SIGNED" \
+            "$ALIGNED"
+
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$SIGNED"
+
+      - name: Upload signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: KING-AI-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: KING-AI-signed
+          path: ${{ runner.temp }}/KING-AI.apk
           if-no-files-found: error
           
