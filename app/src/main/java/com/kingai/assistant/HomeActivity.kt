@@ -35,21 +35,16 @@ class HomeActivity : ComponentActivity() {
     }
 
     private fun buildUi(): View {
-        val root = FrameLayout(this).apply {
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             setBackgroundColor(0xFF020604.toInt())
             layoutDirection = View.LAYOUT_DIRECTION_RTL
-        }
-        val scrollPage = ScrollView(this).apply {
-            isFillViewport = true
-            clipToPadding = false
-            setPadding(dp(16), dp(18), dp(16), dp(100))
         }
         val page = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(16), dp(14), dp(16), 0)
         }
-        scrollPage.addView(page)
-        root.addView(scrollPage, FrameLayout.LayoutParams(-1, -1))
 
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -138,7 +133,8 @@ class HomeActivity : ComponentActivity() {
             setPadding(dp(12), dp(8), dp(12), dp(8))
             addView(composer, FrameLayout.LayoutParams(-1, -2))
         }
-        root.addView(bottom, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
+        root.addView(page, LinearLayout.LayoutParams(-1, 0, 1f))
+        root.addView(bottom, LinearLayout.LayoutParams(-1, -2))
         return root
     }
 
