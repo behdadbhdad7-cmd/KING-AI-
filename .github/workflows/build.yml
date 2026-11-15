@@ -41,7 +41,7 @@ jobs:
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
         run: gradle assembleDebug --stacktrace
 
-      - name: Sign APK with KING AI key
+      - name: Sign APK
         env:
           KING_KEYSTORE_B64: ${{ secrets.KING_KEYSTORE_B64 }}
           KING_KEYSTORE_PASSWORD: ${{ secrets.KING_KEYSTORE_PASSWORD }}
