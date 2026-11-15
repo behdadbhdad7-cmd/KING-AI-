@@ -229,6 +229,9 @@ class OverlayService : Service() {
                 setHintTextColor(dim)
                 setPadding(dp(12), dp(10), dp(12), dp(10))
                 setSingleLine(true)
+                isFocusable = true
+                isFocusableInTouchMode = true
+                showSoftInputOnFocus = true
                 background = GradientDrawable().apply {
                     cornerRadius = dp(12).toFloat()
                     setColor(0xFF020904.toInt())
@@ -303,11 +306,13 @@ class OverlayService : Service() {
                 ),
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
                 PixelFormat.TRANSLUCENT
             ).apply {
                 gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+                softInputMode =
+                    WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
+                    WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
                 y = dp(100)
             }
 
