@@ -1,5 +1,4 @@
-
-name: Build KING AI APK 
+name: Build KING AI APK
 
 on:
   workflow_dispatch:
@@ -41,41 +40,66 @@ jobs:
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
         run: gradle assembleDebug --stacktrace
 
-      - name: Sign APK
+      - name: Verify signing secrets
+        id: signing
+        shell: bash
         env:
           KING_KEYSTORE_B64: ${{ secrets.KING_KEYSTORE_B64 }}
           KING_KEYSTORE_PASSWORD: ${{ secrets.KING_KEYSTORE_PASSWORD }}
           KING_KEY_ALIAS: ${{ secrets.KING_KEY_ALIAS }}
+          KING_KEY_PASSWORD: ${{ secrets.KING_KEY_PASSWORD || secrets.KING_KEYSTORE_PASSWORD }}
         run: |
-          set -e
+          if [[ -n "$KING_KEYSTORE_B64" && -n "$KING_KEYSTORE_PASSWORD" && -n "$KING_KEY_ALIAS" && -n "$KING_KEY_PASSWORD" ]]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Signing secrets are incomplete. A debug APK will be uploaded for testing, but it cannot update an installation signed with the original KING AI key."
+          fi
 
+      - name: Sign APK with original KING AI key
+        if: steps.signing.outputs.available == 'true'
+        shell: bash
+        env:
+          KING_KEYSTORE_B64: ${{ secrets.KING_KEYSTORE_B64 }}
+          KING_KEYSTORE_PASSWORD: ${{ secrets.KING_KEYSTORE_PASSWORD }}
+          KING_KEY_ALIAS: ${{ secrets.KING_KEY_ALIAS }}
+          KING_KEY_PASSWORD: ${{ secrets.KING_KEY_PASSWORD || secrets.KING_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
           KEYSTORE="$RUNNER_TEMP/king.keystore"
           APK="app/build/outputs/apk/debug/app-debug.apk"
           ALIGNED="$RUNNER_TEMP/aligned.apk"
           SIGNED="$RUNNER_TEMP/KING-AI.apk"
 
-          echo "$KING_KEYSTORE_B64" | base64 --decode > "$KEYSTORE"
-
+          printf '%s' "$KING_KEYSTORE_B64" | base64 --decode > "$KEYSTORE"
           test -s "$KEYSTORE"
           test -s "$APK"
 
-          "$ANDROID_HOME/build-tools/35.0.0/zipalign" \
-            -f 4 "$APK" "$ALIGNED"
-
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -f 4 "$APK" "$ALIGNED"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign \
             --ks "$KEYSTORE" \
             --ks-key-alias "$KING_KEY_ALIAS" \
             --ks-pass env:KING_KEYSTORE_PASSWORD \
-            --key-pass env:KING_KEYSTORE_PASSWORD \
+            --key-pass env:KING_KEY_PASSWORD \
             --out "$SIGNED" \
             "$ALIGNED"
 
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$SIGNED"
 
-      - name: Upload signed APK
+      - name: Upload signed update APK
+        if: steps.signing.outputs.available == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: KING-AI-signed
+          name: KING-AI-update-signed
           path: ${{ runner.temp }}/KING-AI.apk
           if-no-files-found: error
-          
+          retention-days: 14
+
+      - name: Upload debug APK for testing only
+        if: steps.signing.outputs.available != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: KING-AI-debug-not-for-update
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
