@@ -106,7 +106,7 @@ class HomeActivity : ComponentActivity() {
             setHintTextColor(0xFF789581.toInt())
             setTextColor(Color.WHITE)
             textSize = 15f
-            singleLine = true
+            setSingleLine(true)
             imeOptions = EditorInfo.IME_ACTION_SEND
             background = null
             gravity = Gravity.CENTER_VERTICAL
