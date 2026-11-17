@@ -4,22 +4,25 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <group
-        android:scaleX="2.4"
-        android:scaleY="2.4"
-        android:translateX="25.2"
-        android:translateY="22.8">
-        <path
-            android:fillColor="#39FF14"
-            android:strokeColor="#9BFF8A"
-            android:strokeWidth="0.35"
-            android:strokeLineJoin="round"
-            android:pathData="M3,18L5,7L9,11L12,4L15,11L19,7L21,18Z" />
-        <path
-            android:fillColor="#39FF14"
-            android:strokeColor="#9BFF8A"
-            android:strokeWidth="0.35"
-            android:strokeLineJoin="round"
-            android:pathData="M4,20H20V22H4Z" />
-    </group>
+    <path
+        android:fillColor="#003B12"
+        android:strokeColor="#39FF14"
+        android:strokeWidth="1.8"
+        android:strokeLineJoin="round"
+        android:pathData="M17,69 C13,58 12,45 10,37 C16,45 21,50 26,51 C25,39 26,29 30,25 C34,38 39,46 46,49 C44,34 47,18 54,12 C61,18 64,34 62,49 C69,46 74,38 78,25 C82,29 83,39 82,51 C87,50 92,45 98,37 C96,45 95,58 91,69 C82,76 71,79 54,79 C37,79 26,76 17,69Z" />
+    <path
+        android:fillColor="#39FF14"
+        android:strokeColor="#A5FF8A"
+        android:strokeWidth="1.2"
+        android:pathData="M17,69 C27,76 39,79 54,79 C69,79 81,76 91,69 L89,82 C78,88 67,90 54,90 C41,90 30,88 19,82Z" />
+    <path
+        android:fillColor="#39FF14"
+        android:strokeColor="#D4FFC8"
+        android:strokeWidth="1"
+        android:pathData="M10,37 C13,33 18,33 21,37 C21,42 18,45 15.5,45 C13,45 10,42 10,37Z M26,25 C29,20 34,20 37,25 C37,31 34,34 31.5,34 C29,34 26,31 26,25Z M47,12 C50,5 58,5 61,12 C61,19 58,23 54,23 C50,23 47,19 47,12Z M71,25 C74,20 79,20 82,25 C82,31 79,34 76.5,34 C74,34 71,31 71,25Z M87,37 C90,33 95,33 98,37 C98,42 95,45 92.5,45 C90,45 87,42 87,37Z" />
+    <path
+        android:fillColor="#001A08"
+        android:strokeColor="#39FF14"
+        android:strokeWidth="1"
+        android:pathData="M23,70 C32,75 42,76 54,76 C66,76 76,75 85,70" />
 </vector>
