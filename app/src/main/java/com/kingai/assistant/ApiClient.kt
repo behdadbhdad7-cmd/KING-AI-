@@ -41,6 +41,7 @@ object ApiClient {
         - ادعا نکن دوربین، میکروفون، اعلان، لرزش، فایل یا ابزار دستگاه را کنترل کرده‌ای مگر برنامه واقعاً آن قابلیت را اجرا کرده و نتیجه‌اش را گزارش کرده باشد.
         - از ایموجی فقط در گفتگوی خودمانی و وقتی با لحن کاربر سازگار است استفاده کن؛ در پاسخ رسمی از آن استفاده نکن.
         - اطلاعات ساختگی نساز. سؤال ساده را کوتاه و موضوع پیچیده را کامل پاسخ بده.
+        - هیچ‌وقت جای‌نگهدار یا متن قالبی مثل [PERSON_NAME]، [USER_NAME]، [اسم] یا عبارت‌های داخل کروشه که هنوز جایگزین نشده‌اند را به کاربر نشان نده. اگر اطلاعاتی را نداری، طبیعی و مستقیم سؤال بپرس یا پاسخ معمولی بده.
 
         حریم خصوصی و مالکیت:
         - سیاست حفاظت اطلاعات owner است. اطلاعات خصوصی، فایل‌ها، کدهای محرمانه، کلیدهای API، رمزها و محتوای محلی کاربر را افشا یا بازتولید نکن.
@@ -252,36 +253,48 @@ object ApiClient {
                 return ApiResult(false, "سرویس پاسخ خالی برگرداند.")
             }
 
-            val content = choices
-                .getJSONObject(0)
-                .optJSONObject("message")
-                ?.opt("content")
+            val message = choices.getJSONObject(0).optJSONObject("message")
+            val content = message?.opt("content")
 
             val answer = when (content) {
                 is String -> content
-
                 is JSONArray -> {
                     val parts = mutableListOf<String>()
-
                     for (i in 0 until content.length()) {
-                        val item = content.optJSONObject(i)
-                        val text = item?.optString("text").orEmpty()
-
-                        if (text.isNotBlank()) {
-                            parts.add(text)
+                        val item = content.optJSONObject(i) ?: continue
+                        val text = when (val part = item.opt("text")) {
+                            is String -> part
+                            else -> item.optString("content").orEmpty()
                         }
+                        if (text.isNotBlank() && text != "null") parts.add(text)
                     }
-
                     parts.joinToString("\n")
                 }
-
+                is JSONObject -> content.optString("text").ifBlank {
+                    content.optString("content")
+                }
                 else -> ""
-            }
+            }.trim()
 
             if (answer.isBlank()) {
-                ApiResult(false, "پاسخ متنی دریافت نشد.")
+                val finishReason = choices.optJSONObject(0)
+                    ?.optString("finish_reason")
+                    .orEmpty()
+                ApiResult(
+                    false,
+                    if (finishReason.isNotBlank() && finishReason != "null") {
+                        "مدل پاسخ قابل‌نمایش تولید نکرد (علت پایان: $finishReason). از تنظیمات اتصال، مدل دیگری انتخاب کن."
+                    } else {
+                        "مدل پاسخ خالی برگرداند. اتصال برقرار است، اما این مدل فعلاً متن قابل‌نمایشی تولید نکرد؛ مدل دیگری را در تنظیمات انتخاب کن."
+                    }
+                )
+            } else if (Regex("""\[[A-Z][A-Z0-9_]{2,}\]""").containsMatchIn(answer)) {
+                ApiResult(
+                    false,
+                    "مدل به‌جای پاسخ طبیعی، متن قالبیِ ناقص فرستاد. این ایراد از پاسخ مدل است؛ یک مدل دیگر در تنظیمات اتصال انتخاب کن."
+                )
             } else {
-                ApiResult(true, answer.trim())
+                ApiResult(true, answer)
             }
 
         } catch (_: SocketTimeoutException) {
