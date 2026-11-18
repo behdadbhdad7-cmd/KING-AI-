@@ -141,7 +141,7 @@ class TelegramAccountManager private constructor(context: Context) {
     fun isAutoReplyEnabled(id: String): Boolean {
         if (id != ACCOUNT_ONE && id != ACCOUNT_TWO) return false
 
-        return autoReplyPreferences.getBoolean("enabled_$id", true)
+        return autoReplyPreferences.getBoolean("enabled_$id", false)
     }
 
     private fun handleNewMessage(
