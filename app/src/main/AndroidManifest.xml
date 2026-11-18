@@ -35,6 +35,7 @@
         <activity android:name=".SettingsActivity" android:exported="false" />
         <activity android:name=".ApiSettingsActivity" android:exported="false" />
         <activity android:name=".HistoryActivity" android:exported="false" />
+        <activity android:name=".ConversationsActivity" android:exported="false" />
         <activity android:name=".CameraCaptureActivity" android:exported="false" />
         <activity android:name=".LaunchPanelActivity" android:exported="false" />
         <activity android:name=".KingRunActivity" android:exported="false" />
