@@ -37,18 +37,23 @@ object ApiClient {
         message: String,
         callback: (ApiResult) -> Unit
     ) {
-        executor.execute {
-            val result = request(context, message)
+        sendConversation(context, listOf(ConversationMessage("user", message)), callback)
+    }
 
-            mainHandler.post {
-                callback(result)
-            }
+    fun sendConversation(
+        context: Context,
+        history: List<ConversationMessage>,
+        callback: (ApiResult) -> Unit
+    ) {
+        executor.execute {
+            val result = request(context, history)
+            mainHandler.post { callback(result) }
         }
     }
 
     private fun request(
         context: Context,
-        message: String
+        history: List<ConversationMessage>
     ): ApiResult {
 
         val rawToken = ApiConfig.getToken(context)
@@ -100,7 +105,7 @@ object ApiClient {
             endpoint,
             token,
             model,
-            message
+            history
         )
     }
 
@@ -108,7 +113,7 @@ object ApiClient {
         endpoint: String,
         token: String,
         model: String,
-        message: String
+        history: List<ConversationMessage>
     ): ApiResult {
 
         var connection: HttpURLConnection? = null
@@ -138,19 +143,20 @@ object ApiClient {
                 "application/json"
             )
 
-            val messages = JSONArray()
-                .put(
-                    JSONObject().apply {
-                        put("role", "system")
-                        put("content", systemPrompt)
-                    }
-                )
-                .put(
-                    JSONObject().apply {
-                        put("role", "user")
-                        put("content", message)
-                    }
-                )
+            val messages = JSONArray().put(
+                JSONObject().apply {
+                    put("role", "system")
+                    put("content", systemPrompt)
+                }
+            )
+            history.takeLast(40).forEach { item ->
+                if (item.role == "user" || item.role == "assistant") {
+                    messages.put(JSONObject().apply {
+                        put("role", item.role)
+                        put("content", item.content)
+                    })
+                }
+            }
 
             val body = JSONObject().apply {
                 put("model", model)
