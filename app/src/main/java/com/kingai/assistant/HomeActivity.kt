@@ -25,6 +25,7 @@ class HomeActivity : ComponentActivity() {
     private lateinit var orb: AiOrbView
     private lateinit var hero: LinearLayout
     private var busy = false
+    private var activeConversationId: String? = null
     private val green = 0xFF39FF14.toInt()
     private val muted = 0xFFA9CDB4.toInt()
 
@@ -153,6 +154,9 @@ class HomeActivity : ComponentActivity() {
         val question = input.text.toString().trim()
         if (question.isEmpty()) return
         input.setText("")
+        if (activeConversationId == null) activeConversationId = ConversationStore.create(this)
+        val conversationId = activeConversationId!!
+        ConversationStore.add(this, conversationId, "user", question)
         addBubble(question, true)
         if (hero.visibility != View.GONE) {
             hero.animate().cancel()
@@ -168,23 +172,28 @@ class HomeActivity : ComponentActivity() {
         val local = CommandRouter(this).handle(question)
         if (local.success) {
             addBubble(local.message, false)
+            ConversationStore.add(this, conversationId, "assistant", local.message)
             HistoryStore.add(this, question, local.message)
             return
         }
         if (!ApiConfig.hasToken(this) || ApiConfig.getBaseUrl(this).isBlank() ||
             ApiConfig.getModel(this).isBlank()) {
-            addBubble("برای پاسخ‌گویی هوشمند، اتصال API را از منوی تنظیمات فعال کن.", false)
+            val note = "برای پاسخ‌گویی هوشمند، اتصال API را از منوی تنظیمات فعال کن."
+            addBubble(note, false)
+            ConversationStore.add(this, conversationId, "assistant", note)
             return
         }
 
         busy = true
         addBubble("در حال فکر کردن...", false)
-        ApiClient.sendMessage(this, question) { response ->
-            if (isFinishing || isDestroyed) return@sendMessage
+        val history = ConversationStore.get(this, conversationId)?.messages.orEmpty()
+        ApiClient.sendConversation(this, history) { response ->
+            if (isFinishing || isDestroyed) return@sendConversation
             busy = false
             val last = messages.getChildAt(messages.childCount - 1)
             if (last is TextView && last.text == "در حال فکر کردن...") messages.removeView(last)
             addBubble(response.message, false)
+            ConversationStore.add(this, conversationId, "assistant", response.message)
             HistoryStore.add(this, question, response.message)
         }
     }
@@ -247,7 +256,17 @@ class HomeActivity : ComponentActivity() {
             elevation = dp(12).toFloat()
             setBackgroundDrawable(GradientDrawable().apply { setColor(Color.TRANSPARENT) })
         }
-        item("گفت‌وگوی جدید") { messages.removeAllViews(); popup.dismiss() }
+        item("گفت‌وگوی جدید") {
+            activeConversationId = null
+            messages.removeAllViews()
+            hero.visibility = View.VISIBLE
+            hero.alpha = 1f
+            popup.dismiss()
+        }
+        item("گفتگوهای قدیمی") {
+            popup.dismiss()
+            startActivity(android.content.Intent(this, ConversationsActivity::class.java))
+        }
         item("تاریخچه فرمان‌ها") {
             popup.dismiss()
             startActivity(android.content.Intent(this, HistoryActivity::class.java))
