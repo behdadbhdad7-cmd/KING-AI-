@@ -12,6 +12,7 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.ScrollView
@@ -22,7 +23,7 @@ class HomeActivity : ComponentActivity() {
     private lateinit var messages: LinearLayout
     private lateinit var scroll: ScrollView
     private lateinit var input: EditText
-    private lateinit var orb: AiOrbView
+    private lateinit var brainHero: ImageView
     private lateinit var hero: LinearLayout
     private var busy = false
     private var activeConversationId: String? = null
@@ -53,8 +54,12 @@ class HomeActivity : ComponentActivity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        val crown = CrownView(this)
-        header.addView(crown, LinearLayout.LayoutParams(dp(56), dp(54)))
+        val brainMark = ImageView(this).apply {
+            setImageResource(R.drawable.king_ai_brain_icon)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = "نشان هوش مصنوعی KING AI"
+        }
+        header.addView(brainMark, LinearLayout.LayoutParams(dp(58), dp(58)))
         val brand = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         brand.addView(text("KING AI", 23f, green, true))
         brand.addView(text("دستیار هوشمند شما", 11f, muted))
@@ -77,9 +82,20 @@ class HomeActivity : ComponentActivity() {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
         }
-        orb = AiOrbView(this)
-        hero.addView(orb, LinearLayout.LayoutParams(-1, dp(164)).apply {
-            topMargin = dp(2)
+        brainHero = ImageView(this).apply {
+            setImageResource(R.drawable.king_ai_brain_icon)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = "مغز هوشمند KING AI"
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(0x2200FF22)
+                setStroke(dp(1), 0x5539FF14)
+            }
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+        }
+        hero.addView(brainHero, LinearLayout.LayoutParams(dp(158), dp(158)).apply {
+            topMargin = dp(4)
+            bottomMargin = dp(8)
         })
         val welcome = text("سلام! من KING AI هستم", 19f, green, true).apply {
             gravity = Gravity.CENTER
@@ -252,7 +268,14 @@ class HomeActivity : ComponentActivity() {
             }
             menu.addView(v, LinearLayout.LayoutParams(dp(210), -2))
         }
-        val popup = PopupWindow(menu, -2, -2, true).apply {
+        val menuScroll = ScrollView(this).apply {
+            isFillViewport = true
+            isVerticalScrollBarEnabled = true
+            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
+            addView(menu)
+        }
+        val popupHeight = minOf(dp(480), resources.displayMetrics.heightPixels - dp(150))
+        val popup = PopupWindow(menuScroll, -2, popupHeight, true).apply {
             elevation = dp(12).toFloat()
             setBackgroundDrawable(GradientDrawable().apply { setColor(Color.TRANSPARENT) })
         }
