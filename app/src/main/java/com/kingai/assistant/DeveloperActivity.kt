@@ -31,7 +31,7 @@ class DeveloperActivity : ComponentActivity() {
     private val modes = listOf(
         "رفع خطا و اصلاح کد", "ساخت کد جدید",
         "توضیح و آموزش کد", "بهینه‌سازی کد",
-        "بررسی امنیت کد", "طراحی برنامه", "ساخت پروژه کامل APK"
+        "بررسی امنیت کد", "طراحی برنامه", "ساخت پروژه اندروید"
     )
     private val platforms = listOf("عمومی", "Android / Kotlin", "Python", "وب / HTML")
 
@@ -251,7 +251,7 @@ class DeveloperActivity : ComponentActivity() {
             append("نوع عملیات: ").append(selectedMode).append("\n")
             append("زبان یا پلتفرم هدف: ").append(selectedPlatform).append("\n")
             append("درخواست کاربر: ").append(request)
-            if (selectedMode == "ساخت پروژه کامل APK") {
+            if (selectedMode == "ساخت پروژه اندروید") {
                 append("\n\\nحالت ساخت پروژه کامل اندروید فعال است. مانند یک مهندس ارشد Android عمل کن.")
                 append("\nابتدا نیازمندی‌ها را خلاصه کن، سپس ساختار کامل پروژه را با مسیر دقیق هر فایل ارائه بده.")
                 append("\nبرای هر فایل، یک بلوک کد مستقل با مسیر فایل در خط اول مانند // FILE: app/src/main/... بساز.")
