@@ -125,7 +125,7 @@ class DeveloperActivity : ComponentActivity() {
         }
         output.text = "KING AI در حال بررسی است..."
         lastAnswer = ""
-        ApiClient.sendMessage(this, prompt) { result ->
+        ApiClient.sendMessage(this, prompt, includeMemory = false) { result ->
             if (isFinishing || isDestroyed) return@sendMessage
             output.text = result.message
             lastAnswer = if (result.success) result.message else ""
