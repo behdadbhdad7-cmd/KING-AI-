@@ -27,11 +27,14 @@ class DeveloperActivity : ComponentActivity() {
     private var selectedText = ""
     private var selectedName = ""
     private var lastAnswer = ""
+    private var lastHtml = ""
+    private lateinit var previewButton: TextView
+    private lateinit var saveHtmlButton: TextView
 
     private val modes = listOf(
         "رفع خطا و اصلاح کد", "ساخت کد جدید",
         "توضیح و آموزش کد", "بهینه‌سازی کد",
-        "بررسی امنیت کد", "طراحی برنامه", "ساخت پروژه اندروید"
+        "بررسی امنیت کد", "طراحی برنامه", "ساخت پروژه اندروید", "طراحی وب‌سایت"
     )
     private val platforms = listOf("عمومی", "Android / Kotlin", "Python", "وب / HTML")
 
@@ -67,6 +70,14 @@ class DeveloperActivity : ComponentActivity() {
             selectedName = ""
             fileInfo.text = "خواندن فایل ناموفق بود."
         }
+    }
+
+    private val saveHtmlFile = registerForActivityResult(ActivityResultContracts.CreateDocument("text/html")) { uri ->
+        if (uri == null || lastHtml.isBlank()) return@registerForActivityResult
+        try {
+            contentResolver.openOutputStream(uri)?.use { it.write(lastHtml.toByteArray(Charsets.UTF_8)) }
+            toast("فایل HTML ذخیره شد.")
+        } catch (_: Exception) { toast("ذخیره‌ی HTML ناموفق بود.") }
     }
 
     private val saveFile = registerForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
@@ -190,6 +201,15 @@ class DeveloperActivity : ComponentActivity() {
         }
         runButton = actionButton("▶  اجرای درخواست با KING AI") { runTask() }
         footer.addView(runButton, LinearLayout.LayoutParams(-1, dp(52)))
+        previewButton = actionButton("◉  پیش‌نمایش وب‌سایت") { previewWebsite() }
+        previewButton.visibility = View.GONE
+        footer.addView(previewButton, LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(8) })
+        saveHtmlButton = actionButton("ذخیره‌ی فایل HTML") {
+            if (lastHtml.isBlank()) toast("اول وب‌سایت را تولید کن.")
+            else saveHtmlFile.launch("KING-AI-Website.html")
+        }
+        saveHtmlButton.visibility = View.GONE
+        footer.addView(saveHtmlButton, LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(6) })
         val bottomRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         bottomRow.addView(actionButton("ذخیره‌ی پاسخ") {
             if (lastAnswer.isBlank()) toast("هنوز پاسخی برای ذخیره نیست.")
@@ -211,7 +231,12 @@ class DeveloperActivity : ComponentActivity() {
             isClickable = true
             isFocusable = true
             setOnClickListener {
-                if (map === modeButtons) selectedMode = value else selectedPlatform = value
+                if (map === modeButtons) {
+                    selectedMode = value
+                    val webMode = value == "طراحی وب‌سایت"
+                    previewButton.visibility = if (webMode) View.VISIBLE else View.GONE
+                    saveHtmlButton.visibility = if (webMode) View.VISIBLE else View.GONE
+                } else selectedPlatform = value
                 refreshChoices(map, value)
             }
         }
@@ -251,6 +276,14 @@ class DeveloperActivity : ComponentActivity() {
             append("نوع عملیات: ").append(selectedMode).append("\n")
             append("زبان یا پلتفرم هدف: ").append(selectedPlatform).append("\n")
             append("درخواست کاربر: ").append(request)
+            if (selectedMode == "طراحی وب‌سایت") {
+                append("\\nحالت طراح وب‌سایت فعال است. یک وب‌سایت کامل، زیبا، واکنش‌گرا و فارسی‌دوست بساز.")
+                append("\\nخروجی اصلی باید فقط یک فایل HTML مستقل و کامل باشد که CSS و JavaScript آن داخل همان فایل قرار دارد.")
+                append("\\nکد نهایی را در یک بلوک ```html قرار بده؛ قبل و بعد آن توضیح طولانی ننویس.")
+                append("\\nاز فونت‌ها، تصویرها و کتابخانه‌های خارجی استفاده نکن؛ صفحه باید بدون اینترنت هم تا حد ممکن نمایش داده شود.")
+                append("\\nطراحی موبایل‌اول، دسترس‌پذیر، راست‌چین برای فارسی، دارای حالت واکنش‌گرا و تعاملات واقعی باشد.")
+                append("\\nهیچ فرم پرداخت، ورود واقعی یا ارسال اطلاعات به سرور را وانمود نکن؛ اگر backend لازم است، شفاف توضیح بده.")
+            }
             if (selectedMode == "ساخت پروژه اندروید") {
                 append("\n\\nحالت ساخت پروژه کامل اندروید فعال است. مانند یک مهندس ارشد Android عمل کن.")
                 append("\nابتدا نیازمندی‌ها را خلاصه کن، سپس ساختار کامل پروژه را با مسیر دقیق هر فایل ارائه بده.")
@@ -283,7 +316,23 @@ class DeveloperActivity : ComponentActivity() {
             runButton.alpha = 1f
             output.text = result.message
             lastAnswer = if (result.success) result.message else ""
+            lastHtml = if (result.success && selectedMode == "طراحی وب‌سایت") extractHtml(result.message) else ""
+            if (selectedMode == "طراحی وب‌سایت" && result.success && lastHtml.isBlank()) {
+                output.text = result.message + "\\n\\nکد HTML کامل در قالب قابل پیش‌نمایش پیدا نشد؛ از KING AI بخواه فقط یک بلوک HTML کامل تحویل بدهد."
+            }
         }
+    }
+
+    private fun previewWebsite() {
+        if (lastHtml.isBlank()) { toast("اول یک وب‌سایت تولید کن."); return }
+        startActivity(android.content.Intent(this, WebPreviewActivity::class.java).putExtra(WebPreviewActivity.EXTRA_HTML, lastHtml))
+    }
+
+    private fun extractHtml(answer: String): String {
+        val fenced = Regex("```(?:html)?\\s*([\\s\\S]*?)```", RegexOption.IGNORE_CASE).find(answer)?.groupValues?.getOrNull(1)?.trim()
+        val candidate = fenced ?: answer.trim()
+        val start = candidate.indexOf("<", ignoreCase = false)
+        return if (start >= 0 && candidate.substring(start).contains(Regex("<\\s*(html|!doctype)", RegexOption.IGNORE_CASE))) candidate.substring(start).trim() else ""
     }
 
     private fun actionButton(label: String, action: () -> Unit) = TextView(this).apply {
