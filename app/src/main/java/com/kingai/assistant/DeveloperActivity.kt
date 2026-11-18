@@ -234,6 +234,10 @@ class DeveloperActivity : ComponentActivity() {
                 if (map === modeButtons) {
                     selectedMode = value
                     val webMode = value == "طراحی وب‌سایت"
+                    if (webMode) {
+                        selectedPlatform = "وب / HTML"
+                        refreshChoices(platformButtons, selectedPlatform)
+                    }
                     previewButton.visibility = if (webMode) View.VISIBLE else View.GONE
                     saveHtmlButton.visibility = if (webMode) View.VISIBLE else View.GONE
                 } else selectedPlatform = value
