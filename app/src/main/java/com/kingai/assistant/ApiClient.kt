@@ -16,7 +16,8 @@ object ApiClient {
 
     data class ApiResult(
         val success: Boolean,
-        val message: String
+        val message: String,
+        val actualModel: String? = null
     )
 
     private val executor = Executors.newFixedThreadPool(2)
@@ -95,14 +96,20 @@ object ApiClient {
             .trim()
             .trimEnd('/')
 
-        val model = ApiConfig.getModel(context).trim()
+        val configuredModel = ApiConfig.getModel(context).trim()
+        val mode = ApiConfig.getMode(context)
+        val isOpenRouter = baseUrl.contains("openrouter.ai", ignoreCase = true)
+        val model = if (mode == "auto" && isOpenRouter) "openrouter/free" else configuredModel
 
         if (token.isBlank()) {
             return ApiResult(false, "کلید API خالی است.")
         }
 
         if (baseUrl.isBlank() || model.isBlank()) {
-            return ApiResult(false, "آدرس سرویس یا نام مدل تنظیم نشده است.")
+            return ApiResult(false, "آدرس سرویس یا نام مدل تنظیم نشده است. برای حالت خودکار از OpenRouter استفاده کن یا مدل را دستی انتخاب کن.")
+        }
+        if (mode == "auto" && !isOpenRouter) {
+            return ApiResult(false, "انتخاب خودکار فقط با OpenRouter فعال است. برای سرویس دیگر حالت دستی را انتخاب کن.")
         }
 
         if (!baseUrl.startsWith("https://", true)) {
@@ -128,7 +135,8 @@ object ApiClient {
             token,
             model,
             history,
-            if (includeMemory) MemoryStore.promptContext(context) else ""
+            if (includeMemory) MemoryStore.promptContext(context) else "",
+            ApiConfig.getMaxTokens(context)
         )
     }
 
@@ -137,7 +145,8 @@ object ApiClient {
         token: String,
         model: String,
         history: List<ConversationMessage>,
-        memoryContext: String
+        memoryContext: String,
+        maxTokens: Int
     ): ApiResult {
 
         var connection: HttpURLConnection? = null
@@ -166,6 +175,8 @@ object ApiClient {
                 "Accept",
                 "application/json"
             )
+            connection.setRequestProperty("HTTP-Referer", "https://github.com/behdadbhdad7-cmd/KING-AI-")
+            connection.setRequestProperty("X-Title", "KING AI Android")
 
             val messages = JSONArray().put(
                 JSONObject().apply {
@@ -186,7 +197,7 @@ object ApiClient {
                 put("model", model)
                 put("messages", messages)
                 put("temperature", 0.7)
-                put("max_tokens", 512)
+                put("max_tokens", maxTokens.coerceIn(256, 1536))
                 put("stream", false)
             }
 
@@ -242,6 +253,7 @@ object ApiClient {
             }
 
             val json = JSONObject(responseText)
+            val actualModel = json.optString("model").takeIf { it.isNotBlank() && it != "null" } ?: model
 
             val choices = json.optJSONArray("choices")
                 ?: return ApiResult(
@@ -294,7 +306,7 @@ object ApiClient {
                     "مدل به‌جای پاسخ طبیعی، متن قالبیِ ناقص فرستاد. این ایراد از پاسخ مدل است؛ یک مدل دیگر در تنظیمات اتصال انتخاب کن."
                 )
             } else {
-                ApiResult(true, answer)
+                ApiResult(true, answer, actualModel)
             }
 
         } catch (_: SocketTimeoutException) {
