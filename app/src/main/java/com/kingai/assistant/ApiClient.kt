@@ -335,17 +335,22 @@ object ApiClient {
         } catch (_: SocketTimeoutException) {
             ApiResult(
                 false,
-                "زمان پاسخ تمام شد؛ اینترنت یا سرور کند است."
+                "اتصال به سرویس هوش مصنوعی برقرار نشد یا زمان پاسخ تمام شد. اینترنت را بررسی کن؛ اگر سرویس در شبکه‌ات در دسترس نیست، VPN را روشن کن و دوباره امتحان کن."
             )
         } catch (_: UnknownHostException) {
             ApiResult(
                 false,
-                "اینترنت یا آدرس سرور در دسترس نیست."
+                "آدرس سرویس هوش مصنوعی پیدا نشد. اتصال اینترنت را بررسی کن؛ اگر سرویس در شبکه‌ات مسدود یا در دسترس نیست، VPN را روشن کن و دوباره امتحان کن."
+            )
+        } catch (_: java.net.ConnectException) {
+            ApiResult(
+                false,
+                "ارتباط با سرور هوش مصنوعی برقرار نشد. اینترنت را بررسی کن؛ اگر سرویس در شبکه‌ات در دسترس نیست، VPN را روشن کن و دوباره امتحان کن."
             )
         } catch (e: Exception) {
             ApiResult(
                 false,
-                "خطای ارتباط: ${e.javaClass.simpleName}"
+                "خطای ارتباط: ${e.javaClass.simpleName}. اینترنت و دسترسی به سرویس را بررسی کن."
             )
         } finally {
             connection?.disconnect()
