@@ -19,6 +19,36 @@ class CommandRouter(context: Context) {
         val n = FaText.normalize(text)
 
         return when {
+            has(n, "چی یادت هست", "حافظه من", "حافظهام", "چه چیزهایی یادت هست") -> {
+                val saved = MemoryStore.all(ctx)
+                CommandResult(if (saved.isEmpty()) "هنوز چیزی در حافظه ذخیره نشده. برای ذخیره بنویس: «به خاطر بسپار ...»"
+                    else "چیزهایی که با اجازه‌ات ذخیره کرده‌ام:\n" + saved.mapIndexed { i, item -> "${i + 1}. $item" }.joinToString("\n"))
+            }
+
+            has(n, "پاک کن حافظه", "پاکسازی حافظه", "حافظه را پاک کن") -> {
+                MemoryStore.clear(ctx)
+                CommandResult("حافظه‌ی محلی پاک شد.")
+            }
+
+            n.startsWith("به خاطر بسپار") || n.startsWith("یادت باشه") || n.startsWith("این رو یادت بمونه") -> {
+                val fact = when {
+                    text.startsWith("به خاطر بسپار") -> text.removePrefix("به خاطر بسپار").trim(' ', ':', '：', '-')
+                    text.startsWith("یادت باشه") -> text.removePrefix("یادت باشه").trim(' ', ':', '：', '-')
+                    else -> text.removePrefix("این رو یادت بمونه").trim(' ', ':', '：', '-')
+                }
+                if (MemoryStore.remember(ctx, fact)) CommandResult("باشه، این مورد را در حافظه‌ی همین گوشی ذخیره کردم. هر وقت خواستی می‌توانی بگویی «چی یادت هست؟» یا «فراموش کن ...».")
+                else CommandResult("این مورد خالی، خیلی طولانی یا شبیه اطلاعات محرمانه است و ذخیره نشد.", false)
+            }
+
+            n.startsWith("فراموش کن") -> {
+                val query = text.substringAfter("فراموش کن", "").trim()
+                val removed = MemoryStore.forget(ctx, query)
+                if (query.isBlank()) CommandResult("بگو کدام مورد را فراموش کنم؛ برای پاک‌کردن همه‌ی موارد بگو «پاک کن حافظه».")
+                else CommandResult(if (removed > 0) "${removed} مورد از حافظه پاک شد." else "موردی مطابق این عبارت در حافظه پیدا نکردم.")
+            }
+
+            has(n, "تایمر") -> DeviceActions.setTimer(ctx, text)
+
             has(n, "راهنما", "دستورات", "help") -> help()
 
             has(n, "اسکرین") -> CommandResult(
@@ -86,7 +116,9 @@ class CommandRouter(context: Context) {
             "• چراغ\u200cقوه روشن / خاموش\n" +
             "• گالری\n" +
             "• وای\u200cفای / بلوتوث\n" +
-            "• باز کن «نام برنامه»\n\n" +
+            "• باز کن «نام برنامه»\n" +
+            "• تایمر ۵ دقیقه\n" +
+            "• به خاطر بسپار ... / چی یادت هست؟ / فراموش کن ...\n\n" +
             "پاسخ‌گویی هوشمند با API در مرحله‌ی بعد فعال می‌شود."
     )
 }
