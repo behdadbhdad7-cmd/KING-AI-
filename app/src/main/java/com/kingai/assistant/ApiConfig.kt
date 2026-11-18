@@ -21,6 +21,8 @@ object ApiConfig {
 
     private const val BASE_URL = "base_url"
     private const val MODEL = "model"
+    private const val MODE = "model_mode"
+    private const val MAX_TOKENS = "max_tokens"
     private const val TOKEN_IV = "token_iv"
     private const val TOKEN_DATA = "token_data"
 
@@ -126,6 +128,22 @@ object ApiConfig {
             .putString(MODEL, modelName)
             .commit()
     }
+
+    fun saveMode(context: Context, mode: String): Boolean {
+        if (mode != "auto" && mode != "manual") return false
+        return prefs(context).edit().putString(MODE, mode).commit()
+    }
+
+    fun getMode(context: Context): String =
+        prefs(context).getString(MODE, "auto") ?: "auto"
+
+    fun saveMaxTokens(context: Context, value: Int): Boolean {
+        val safeValue = value.coerceIn(256, 1536)
+        return prefs(context).edit().putInt(MAX_TOKENS, safeValue).commit()
+    }
+
+    fun getMaxTokens(context: Context): Int =
+        prefs(context).getInt(MAX_TOKENS, 768).coerceIn(256, 1536)
 
     fun getBaseUrl(context: Context): String =
         prefs(context).getString(BASE_URL, "") ?: ""
