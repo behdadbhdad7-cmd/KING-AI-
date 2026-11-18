@@ -178,8 +178,8 @@ object ApiClient {
                 as HttpURLConnection
 
             connection.requestMethod = "POST"
-            connection.connectTimeout = 10000
-            connection.readTimeout = 30000
+            connection.connectTimeout = 20000
+            connection.readTimeout = 90000
             connection.doOutput = true
 
             connection.setRequestProperty(
@@ -218,7 +218,7 @@ object ApiClient {
                 put("model", model)
                 put("messages", messages)
                 put("temperature", 0.7)
-                put("max_tokens", maxTokens.coerceIn(256, 1536))
+                put("max_tokens", maxTokens.coerceIn(256, 8192))
                 put("stream", false)
             }
 
@@ -315,7 +315,9 @@ object ApiClient {
                     .orEmpty()
                 ApiResult(
                     false,
-                    if (finishReason.isNotBlank() && finishReason != "null") {
+                    if (finishReason == "length") {
+                        "پاسخ مدل به سقف توکن رسید و ناقص ماند. از تنظیمات، حداکثر طول پاسخ را بیشتر کن یا درخواست را به چند بخش تقسیم کن."
+                    } else if (finishReason.isNotBlank() && finishReason != "null") {
                         "مدل پاسخ قابل‌نمایش تولید نکرد (علت پایان: $finishReason). از تنظیمات اتصال، مدل دیگری انتخاب کن."
                     } else {
                         "مدل پاسخ خالی برگرداند. اتصال برقرار است، اما این مدل فعلاً متن قابل‌نمایشی تولید نکرد؛ مدل دیگری را در تنظیمات انتخاب کن."
