@@ -164,7 +164,7 @@ object ApiClient {
             val messages = JSONArray().put(
                 JSONObject().apply {
                     put("role", "system")
-                    put("content", systemPrompt)
+                    put("content", systemPrompt + MemoryStore.promptContext(context))
                 }
             )
             history.takeLast(40).forEach { item ->
