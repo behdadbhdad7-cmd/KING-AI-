@@ -64,7 +64,7 @@ class WebPreviewActivity : ComponentActivity() {
             allowFileAccessFromFileURLs = false
             allowUniversalAccessFromFileURLs = false
             blockNetworkLoads = true
-            mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER
+            mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
         }
         web.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean = true
