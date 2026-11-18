@@ -349,13 +349,13 @@ class DeveloperActivity : ComponentActivity() {
         val blocks = Regex("```[^\\n]*\\n([\\s\\S]*?)```").findAll(answer)
         val files = linkedMapOf<String, String>()
         for (block in blocks) {
-            val lines = block.groupValues[1].replace("\\r", "").lines()
+            val lines = block.groupValues[1].replace("\r", "").lines()
             if (lines.isEmpty()) continue
             val marker = Regex("^\\s*(?://|#|<!--)\\s*FILE:\\s*(.+?)(?:\\s*-->)?\\s*$", RegexOption.IGNORE_CASE).matchEntire(lines.first()) ?: continue
-            val pathName = marker.groupValues[1].trim().replace("\\\\", "/")
+            val pathName = marker.groupValues[1].trim().replace("\\", "/")
             val parts = pathName.split("/")
             if (pathName.startsWith("/") || parts.any { it == ".." || it.isBlank() } || pathName.contains(":")) continue
-            val body = lines.drop(1).joinToString("\\n").trimEnd()
+            val body = lines.drop(1).joinToString("\n").trimEnd()
             if (body.isNotBlank() && body.toByteArray(Charsets.UTF_8).size <= 1_000_000) files[pathName] = body
             if (files.size >= 100) break
         }
