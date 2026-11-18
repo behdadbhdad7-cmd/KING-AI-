@@ -16,6 +16,7 @@ data class ConversationSession(
 /** نگهداری گفتگوهای کامل روی همین گوشی */
 object ConversationStore {
     private const val KEY = "conversations_v1"
+    private const val MIGRATED = "legacy_history_migrated_v1"
 
     private fun read(ctx: Context): JSONArray = try {
         JSONArray(Prefs.sp(ctx).getString(KEY, "[]") ?: "[]")
@@ -60,7 +61,23 @@ object ConversationStore {
         } catch (_: Exception) { }
     }
 
-    fun list(ctx: Context): List<ConversationSession> = parse(read(ctx))
+    fun list(ctx: Context): List<ConversationSession> {
+        migrateOldHistory(ctx)
+        return parse(read(ctx))
+    }
+
+    private fun migrateOldHistory(ctx: Context) {
+        val prefs = Prefs.sp(ctx)
+        if (prefs.getBoolean(MIGRATED, false)) return
+        try {
+            HistoryStore.list(ctx).asReversed().forEach { old ->
+                val id = "legacy-" + old.time
+                add(ctx, id, "user", old.command)
+                add(ctx, id, "assistant", old.result)
+            }
+        } catch (_: Exception) { }
+        prefs.edit().putBoolean(MIGRATED, true).apply()
+    }
 
     fun get(ctx: Context, id: String): ConversationSession? =
         list(ctx).firstOrNull { it.id == id }
