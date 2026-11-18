@@ -44,6 +44,7 @@
         <activity android:name=".TelegramInboxActivity" android:exported="false" />
         <activity android:name=".MessengerHubActivity" android:exported="false" />
         <activity android:name=".TelegramAccountsActivity" android:exported="false" />
+        <activity android:name=".AgentPermissionsActivity" android:exported="false" />
 
         <service
             android:name=".TelegramNotificationListener"
