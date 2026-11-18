@@ -103,8 +103,8 @@ class ApiSettingsActivity : Activity() {
         tokenLimitLabel = label("")
         root.addView(tokenLimitLabel)
         tokenLimitBar = SeekBar(this).apply {
-            max = 1280
-            progress = (ApiConfig.getMaxTokens(this@ApiSettingsActivity) - 256).coerceIn(0, 1280)
+            max = 7936
+            progress = (ApiConfig.getMaxTokens(this@ApiSettingsActivity) - 256).coerceIn(0, 7936)
             progressTintList = android.content.res.ColorStateList.valueOf(green)
             thumbTintList = android.content.res.ColorStateList.valueOf(green)
         }

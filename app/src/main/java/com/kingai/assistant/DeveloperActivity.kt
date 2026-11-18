@@ -31,7 +31,7 @@ class DeveloperActivity : ComponentActivity() {
     private val modes = listOf(
         "رفع خطا و اصلاح کد", "ساخت کد جدید",
         "توضیح و آموزش کد", "بهینه‌سازی کد",
-        "بررسی امنیت کد", "طراحی برنامه"
+        "بررسی امنیت کد", "طراحی برنامه", "ساخت پروژه اندروید"
     )
     private val platforms = listOf("عمومی", "Android / Kotlin", "Python", "وب / HTML")
 
@@ -251,6 +251,15 @@ class DeveloperActivity : ComponentActivity() {
             append("نوع عملیات: ").append(selectedMode).append("\n")
             append("زبان یا پلتفرم هدف: ").append(selectedPlatform).append("\n")
             append("درخواست کاربر: ").append(request)
+            if (selectedMode == "ساخت پروژه اندروید") {
+                append("\n\\nحالت ساخت پروژه کامل اندروید فعال است. مانند یک مهندس ارشد Android عمل کن.")
+                append("\nابتدا نیازمندی‌ها را خلاصه کن، سپس ساختار کامل پروژه را با مسیر دقیق هر فایل ارائه بده.")
+                append("\nبرای هر فایل، یک بلوک کد مستقل با مسیر فایل در خط اول مانند // FILE: app/src/main/... بساز.")
+                append("\nفایل‌های Gradle، Manifest، Activityها، منابع و کدهای لازم را کامل ارائه کن؛ هیچ فایل ضروری را با سه‌نقطه حذف نکن.")
+                append("\nاز APIها و وابستگی‌های واقعی و سازگار استفاده کن؛ نسخه‌ها را حدس نزن و ناسازگاری را اعلام کن.")
+                append("\nقبل از پایان، فهرست فایل‌ها، دستور ساخت، پیش‌نیازها و تست‌های لازم را بررسی کن.")
+                append("\nهرگز ادعا نکن APK ساخته یا تست شده مگر واقعاً ابزار ساخت آن را اجرا کرده باشد.")
+            }
             if (selectedText.isNotBlank()) {
                 append("\n\nنام فایل انتخاب‌شده: ").append(selectedName)
                 append("\nمحتوای فایل که کاربر صریحاً برای بررسی انتخاب کرده است:\n")

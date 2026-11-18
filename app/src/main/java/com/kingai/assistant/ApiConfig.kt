@@ -138,12 +138,12 @@ object ApiConfig {
         prefs(context).getString(MODE, "auto") ?: "auto"
 
     fun saveMaxTokens(context: Context, value: Int): Boolean {
-        val safeValue = value.coerceIn(256, 1536)
+        val safeValue = value.coerceIn(256, 8192)
         return prefs(context).edit().putInt(MAX_TOKENS, safeValue).commit()
     }
 
     fun getMaxTokens(context: Context): Int =
-        prefs(context).getInt(MAX_TOKENS, 768).coerceIn(256, 1536)
+        prefs(context).getInt(MAX_TOKENS, 2048).coerceIn(256, 8192)
 
     fun getBaseUrl(context: Context): String =
         prefs(context).getString(BASE_URL, "") ?: ""
