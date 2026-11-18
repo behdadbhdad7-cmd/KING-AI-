@@ -36,6 +36,10 @@ import java.util.Locale
  * پیش‌نمایش زنده را نشان می‌دهد، یک عکس می‌گیرد و در Pictures/KING-AI ذخیره می‌کند.
  */
 class CameraCaptureActivity : ComponentActivity() {
+    companion object {
+        const val EXTRA_FRONT_CAMERA = "com.kingai.assistant.EXTRA_FRONT_CAMERA"
+        const val EXTRA_PHOTO_URI = "com.kingai.assistant.EXTRA_PHOTO_URI"
+    }
 
     private lateinit var previewView: PreviewView
     private lateinit var status: TextView
@@ -151,7 +155,7 @@ class CameraCaptureActivity : ComponentActivity() {
                 provider.unbindAll()
                 provider.bindToLifecycle(
                     this,
-                    CameraSelector.DEFAULT_BACK_CAMERA,
+                    if (intent.getBooleanExtra(EXTRA_FRONT_CAMERA, false)) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA,
                     preview,
                     capture
                 )
@@ -211,13 +215,16 @@ class CameraCaptureActivity : ComponentActivity() {
             object : ImageCapture.OnImageSavedCallback {
 
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                    status.text = "عکس با موفقیت ذخیره شد."
+                    status.text = if (intent.getBooleanExtra(EXTRA_FRONT_CAMERA, false)) "سلفی با موفقیت ذخیره شد." else "عکس با موفقیت ذخیره شد."
+                    output.savedUri?.let { uri ->
+                        setResult(RESULT_OK, Intent().putExtra(EXTRA_PHOTO_URI, uri.toString()))
+                    }
                     Toast.makeText(
                         this@CameraCaptureActivity,
                         "عکس در گالری (Pictures/KING-AI) ذخیره شد 👑",
                         Toast.LENGTH_LONG
                     ).show()
-                    handler.postDelayed({ finish() }, 1500)
+                    handler.postDelayed({ finish() }, 700)
                 }
 
                 override fun onError(exception: ImageCaptureException) {

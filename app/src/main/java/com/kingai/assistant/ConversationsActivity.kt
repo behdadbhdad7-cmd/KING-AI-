@@ -12,6 +12,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.ComponentActivity
+import androidx.activity.result.contract.ActivityResultContracts
 
 /** فهرست گفتگوهای قبلی و پنل ادامه‌دادن هر گفتگو */
 class ConversationsActivity : ComponentActivity() {
@@ -24,6 +25,18 @@ class ConversationsActivity : ComponentActivity() {
     private lateinit var chatHost: LinearLayout
     private lateinit var chatScroll: ScrollView
     private lateinit var composer: EditText
+    private var pendingExport = ""
+    private val exportLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        if (uri != null && pendingExport.isNotBlank()) {
+            try {
+                contentResolver.openOutputStream(uri)?.use { it.write(pendingExport.toByteArray(Charsets.UTF_8)) }
+                android.widget.Toast.makeText(this, "فایل ذخیره شد.", android.widget.Toast.LENGTH_SHORT).show()
+            } catch (_: Exception) {
+                android.widget.Toast.makeText(this, "ذخیره فایل ناموفق بود.", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+        pendingExport = ""
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -77,7 +90,7 @@ class ConversationsActivity : ComponentActivity() {
             setPadding(0, dp(8), 0, dp(12))
         }
         chatScroll.addView(chatHost)
-        session.messages.forEach { addBubble(it.content, it.role == "user") }
+        session.messages.forEach { addBubble(it.content, it.role == "user", it.role == "assistant") }
         root.addView(chatScroll, LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = dp(8) })
 
         val bar = LinearLayout(this).apply {
@@ -125,12 +138,35 @@ class ConversationsActivity : ComponentActivity() {
             if (isFinishing || isDestroyed) return@sendConversation
             busy = false
             chatHost.removeView(waiting)
-            addBubble(result.message, false)
+            addBubble(result.message, false, true)
             if (result.success) ConversationStore.add(this, id, "assistant", result.message)
         }
     }
 
-    private fun addBubble(value: String, user: Boolean): View {
+    private fun addBubble(value: String, user: Boolean, canSave: Boolean = false): View {
+        if (value.startsWith("[[KING_IMAGE:") && value.endsWith("]]")) {
+            val uriText = value.removePrefix("[[KING_IMAGE:").removeSuffix("]]")
+            val image = android.widget.ImageView(this).apply {
+                setImageURI(android.net.Uri.parse(uriText))
+                scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                contentDescription = "عکس گرفته‌شده با KING AI"
+                setOnClickListener {
+                    try {
+                        val viewIntent = android.content.Intent(android.content.Intent.ACTION_VIEW)
+                            .setDataAndType(android.net.Uri.parse(uriText), "image/jpeg")
+                        startActivity(viewIntent)
+                    } catch (_: Exception) { }
+                }
+            }
+            val imageRow = LinearLayout(this).apply {
+                gravity = Gravity.END
+                setPadding(0, dp(4), 0, dp(4))
+                addView(image, LinearLayout.LayoutParams(dp(240), dp(240)))
+            }
+            chatHost.addView(imageRow)
+            scrollBottom()
+            return imageRow
+        }
         val bubble = TextView(this).apply {
             text = value
             textSize = 14f
@@ -143,10 +179,30 @@ class ConversationsActivity : ComponentActivity() {
             }
             maxWidth = (resources.displayMetrics.widthPixels * 0.82f).toInt()
         }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = if (user) Gravity.START else Gravity.END
+            addView(bubble)
+            if (canSave) {
+                val fence = 96.toChar().toString().repeat(3)
+                val html = Regex(fence + "(?:html)?\\s*([\\s\\S]*?)" + fence, RegexOption.IGNORE_CASE)
+                    .find(value)?.groupValues?.getOrNull(1)?.trim()
+                val isHtml = html != null && html.contains(Regex("<\\s*(html|!doctype)", RegexOption.IGNORE_CASE))
+                val payload = if (isHtml) html!! else value
+                val fileName = if (isHtml) "KING-AI-Website.html" else "KING-AI-Answer.txt"
+                addView(label("↓  ذخیره فایل  •  " + fileName, 12f, green).apply {
+                    setPadding(dp(10), dp(8), dp(10), dp(5))
+                    setOnClickListener {
+                        pendingExport = payload
+                        exportLauncher.launch(fileName)
+                    }
+                })
+            }
+        }
         val row = LinearLayout(this).apply {
             gravity = if (user) Gravity.START else Gravity.END
             setPadding(0, dp(4), 0, dp(4))
-            addView(bubble)
+            addView(content)
         }
         chatHost.addView(row)
         scrollBottom()
