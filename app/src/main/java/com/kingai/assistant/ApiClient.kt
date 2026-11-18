@@ -53,25 +53,28 @@ object ApiClient {
     fun sendMessage(
         context: Context,
         message: String,
+        includeMemory: Boolean = true,
         callback: (ApiResult) -> Unit
     ) {
-        sendConversation(context, listOf(ConversationMessage("user", message)), callback)
+        sendConversation(context, listOf(ConversationMessage("user", message)), includeMemory, callback)
     }
 
     fun sendConversation(
         context: Context,
         history: List<ConversationMessage>,
+        includeMemory: Boolean = true,
         callback: (ApiResult) -> Unit
     ) {
         executor.execute {
-            val result = request(context, history)
+            val result = request(context, history, includeMemory)
             mainHandler.post { callback(result) }
         }
     }
 
     private fun request(
         context: Context,
-        history: List<ConversationMessage>
+        history: List<ConversationMessage>,
+        includeMemory: Boolean
     ): ApiResult {
 
         val rawToken = ApiConfig.getToken(context)
@@ -123,7 +126,8 @@ object ApiClient {
             endpoint,
             token,
             model,
-            history
+            history,
+            if (includeMemory) MemoryStore.promptContext(context) else ""
         )
     }
 
@@ -131,7 +135,8 @@ object ApiClient {
         endpoint: String,
         token: String,
         model: String,
-        history: List<ConversationMessage>
+        history: List<ConversationMessage>,
+        memoryContext: String
     ): ApiResult {
 
         var connection: HttpURLConnection? = null
@@ -164,7 +169,7 @@ object ApiClient {
             val messages = JSONArray().put(
                 JSONObject().apply {
                     put("role", "system")
-                    put("content", systemPrompt)
+                    put("content", systemPrompt + memoryContext)
                 }
             )
             history.takeLast(40).forEach { item ->

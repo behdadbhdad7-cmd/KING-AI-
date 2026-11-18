@@ -275,6 +275,26 @@ class HomeActivity : ComponentActivity() {
             popup.dismiss()
             startActivity(android.content.Intent(this, ApiSettingsActivity::class.java))
         }
+        item("حافظه‌ی KING AI") {
+            popup.dismiss()
+            val saved = MemoryStore.all(this)
+            android.app.AlertDialog.Builder(this)
+                .setTitle("حافظه‌ی محلی")
+                .setMessage(if (saved.isEmpty()) "حافظه خالی است." else saved.mapIndexed { i, v -> "${i + 1}. $v" }.joinToString("\n"))
+                .setNegativeButton("بستن", null)
+                .setNeutralButton("پاک‌کردن همه") { _, _ ->
+                    android.app.AlertDialog.Builder(this)
+                        .setMessage("همه‌ی موارد حافظه پاک شوند؟")
+                        .setNegativeButton("لغو", null)
+                        .setPositiveButton("پاک کن") { _, _ -> MemoryStore.clear(this) }
+                        .show()
+                }
+                .show()
+        }
+        item("برنامه‌نویس KING") {
+            popup.dismiss()
+            startActivity(android.content.Intent(this, DeveloperActivity::class.java))
+        }
         item("ابزارها و امکانات برنامه") {
             popup.dismiss()
             startActivity(android.content.Intent(this, MainActivity::class.java))
