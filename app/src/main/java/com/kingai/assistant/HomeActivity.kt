@@ -192,13 +192,14 @@ class HomeActivity : ComponentActivity() {
     private fun addBubble(value: String, fromUser: Boolean) {
         val bubble = TextView(this).apply {
             text = value
-            textSize = 14f
+            textSize = 15f
             setTextColor(if (fromUser) Color.WHITE else 0xFFE7F5EA.toInt())
-            setPadding(dp(14), dp(11), dp(14), dp(11))
+            setLineSpacing(dp(2).toFloat(), 1.08f)
+            setPadding(dp(15), dp(12), dp(15), dp(12))
             background = GradientDrawable().apply {
-                cornerRadius = dp(18).toFloat()
-                setColor(if (fromUser) 0xFF087B42.toInt() else 0xFF0B1911.toInt())
-                setStroke(dp(1), if (fromUser) green else 0x6646A85A)
+                cornerRadius = dp(14).toFloat()
+                setColor(if (fromUser) 0xFF075D37.toInt() else 0xFF0A1510.toInt())
+                setStroke(dp(1), if (fromUser) 0xFF28C45A.toInt() else 0x6646A85A)
             }
             maxWidth = (resources.displayMetrics.widthPixels * 0.82f).toInt()
         }
