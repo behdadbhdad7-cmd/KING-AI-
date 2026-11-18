@@ -59,7 +59,7 @@ class HomeActivity : ComponentActivity() {
             scaleType = ImageView.ScaleType.FIT_CENTER
             contentDescription = "نشان هوش مصنوعی KING AI"
         }
-        header.addView(brainMark, LinearLayout.LayoutParams(dp(58), dp(58)))
+        header.addView(brainMark, LinearLayout.LayoutParams(dp(48), dp(48)))
         val brand = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         brand.addView(text("KING AI", 23f, green, true))
         brand.addView(text("دستیار هوشمند شما", 11f, muted))
@@ -93,7 +93,7 @@ class HomeActivity : ComponentActivity() {
             }
             setPadding(dp(12), dp(12), dp(12), dp(12))
         }
-        hero.addView(brainHero, LinearLayout.LayoutParams(dp(158), dp(158)).apply {
+        hero.addView(brainHero, LinearLayout.LayoutParams(dp(136), dp(136)).apply {
             topMargin = dp(4)
             bottomMargin = dp(8)
         })
