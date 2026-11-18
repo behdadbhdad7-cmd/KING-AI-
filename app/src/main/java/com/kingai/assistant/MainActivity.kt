@@ -391,6 +391,11 @@ class MainActivity : ComponentActivity() {
             }
         }
         securityCard.addView(securityButton, vlp(12))
+        val agentPermissionsButton = NeonButton(this, "مدیریت مجوزهای دستیار هوشمند", true)
+        agentPermissionsButton.setOnClickListener {
+            startActivity(Intent(this, AgentPermissionsActivity::class.java))
+        }
+        securityCard.addView(agentPermissionsButton, vlp(10))
         content.addView(securityCard, vlp(14))
         securityCard.enter(520)
 
