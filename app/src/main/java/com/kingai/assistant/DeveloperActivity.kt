@@ -28,13 +28,22 @@ class DeveloperActivity : ComponentActivity() {
         }
         try {
             contentResolver.openInputStream(uri)?.use { stream ->
-                val bytes = stream.readNBytes(100001)
-                if (bytes.size > 100000) {
+                val buffer = ByteArray(8192)
+                val collected = java.io.ByteArrayOutputStream()
+                var total = 0
+                while (true) {
+                    val count = stream.read(buffer)
+                    if (count < 0) break
+                    total += count
+                    if (total > 100000) break
+                    collected.write(buffer, 0, count)
+                }
+                if (total > 100000) {
                     selectedText = ""
                     selectedName = ""
                     fileInfo.text = "فایل بزرگ‌تر از ۱۰۰ کیلوبایت است؛ فایل کوچک‌تری انتخاب کن."
                 } else {
-                    selectedText = String(bytes, Charsets.UTF_8)
+                    selectedText = String(collected.toByteArray(), Charsets.UTF_8)
                     selectedName = uri.lastPathSegment?.substringAfterLast('/') ?: "فایل انتخابی"
                     fileInfo.text = "فایل آماده است: $selectedName؛ فقط با زدن «بررسی کد» ارسال می‌شود."
                 }
