@@ -185,20 +185,19 @@ class HomeActivity : ComponentActivity() {
         }
 
         busy = true
-        addBubble("در حال فکر کردن...", false)
+        val waitingRow = addBubble("در حال فکر کردن...", false)
         val history = ConversationStore.get(this, conversationId)?.messages.orEmpty()
         ApiClient.sendConversation(this, history) { response ->
             if (isFinishing || isDestroyed) return@sendConversation
             busy = false
-            val last = messages.getChildAt(messages.childCount - 1)
-            if (last is TextView && last.text == "در حال فکر کردن...") messages.removeView(last)
+            messages.removeView(waitingRow)
             addBubble(response.message, false)
             ConversationStore.add(this, conversationId, "assistant", response.message)
             HistoryStore.add(this, question, response.message)
         }
     }
 
-    private fun addBubble(value: String, fromUser: Boolean) {
+    private fun addBubble(value: String, fromUser: Boolean): View {
         val bubble = TextView(this).apply {
             text = value
             textSize = 15f
@@ -219,6 +218,7 @@ class HomeActivity : ComponentActivity() {
         }
         messages.addView(row)
         scrollToBottom()
+        return row
     }
 
     private fun scrollToBottom() {
