@@ -7,6 +7,7 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
@@ -22,6 +23,7 @@ class HomeActivity : ComponentActivity() {
     private lateinit var scroll: ScrollView
     private lateinit var input: EditText
     private lateinit var orb: AiOrbView
+    private lateinit var hero: LinearLayout
     private var busy = false
     private val green = 0xFF39FF14.toInt()
     private val muted = 0xFFA9CDB4.toInt()
@@ -70,21 +72,29 @@ class HomeActivity : ComponentActivity() {
         header.addView(menu, LinearLayout.LayoutParams(dp(48), dp(48)))
         page.addView(header, LinearLayout.LayoutParams(-1, -2))
 
+        hero = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+        }
         orb = AiOrbView(this)
-        page.addView(orb, LinearLayout.LayoutParams(-1, dp(270)).apply {
-            topMargin = dp(12)
+        hero.addView(orb, LinearLayout.LayoutParams(-1, dp(164)).apply {
+            topMargin = dp(2)
         })
         val welcome = text("سلام! من KING AI هستم", 19f, green, true).apply {
             gravity = Gravity.CENTER
         }
-        page.addView(welcome, LinearLayout.LayoutParams(-1, -2))
-        page.addView(text("هر چیزی می‌خواهی بپرس یا یک فرمان بده", 13f, muted).apply {
+        hero.addView(welcome, LinearLayout.LayoutParams(-1, -2))
+        hero.addView(text("هر چیزی می‌خواهی بپرس یا یک فرمان بده", 13f, muted).apply {
             gravity = Gravity.CENTER
-        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(7) })
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(5) })
+        page.addView(hero, LinearLayout.LayoutParams(-1, -2))
 
         scroll = ScrollView(this).apply {
-            isFillViewport = false
+            isFillViewport = true
+            isSmoothScrollingEnabled = true
+            descendantFocusability = ViewGroup.FOCUS_BEFORE_DESCENDANTS
             overScrollMode = View.OVER_SCROLL_NEVER
+            clipToPadding = false
         }
         messages = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -144,6 +154,14 @@ class HomeActivity : ComponentActivity() {
         if (question.isEmpty()) return
         input.setText("")
         addBubble(question, true)
+        if (hero.visibility != View.GONE) {
+            hero.animate().cancel()
+            hero.animate().alpha(0f).setDuration(160).withEndAction {
+                hero.visibility = View.GONE
+                hero.alpha = 1f
+                scrollToBottom()
+            }.start()
+        }
         val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
         imm.hideSoftInputFromWindow(input.windowToken, 0)
 
@@ -190,7 +208,16 @@ class HomeActivity : ComponentActivity() {
             addView(bubble)
         }
         messages.addView(row)
-        scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
+        scrollToBottom()
+    }
+
+    private fun scrollToBottom() {
+        // صبر می‌کنیم اندازه‌ی حباب و ارتفاع ScrollView به‌روز شود.
+        scroll.post {
+            messages.post {
+                scroll.smoothScrollTo(0, messages.height)
+            }
+        }
     }
 
     private fun showMenu(anchor: View) {
