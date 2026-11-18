@@ -221,49 +221,37 @@ class NeonButton(context: Context, label: String, compact: Boolean = false) : Fr
     }
 }
 
-/** لوگوی تاج KING AI با درخشش ضربان‌دار (کاملاً با Canvas، بدون فایل تصویر) */
+/** نشان اختصاصی هسته‌ی هوشمند KING AI؛ مدار عصبی مینیمال با نور سبز */
 class CrownView(context: Context) : View(context) {
-    private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
-    private val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = 2.5f
+        strokeWidth = 2.2f
+        strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
+        color = Neon.GREEN
+    }
+    private val nodePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
         color = Neon.GREEN_SOFT
     }
-    private val jewel = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
-        color = Neon.BLACK
-    }
-    private val crown = Path()
-    private val band = RectF(10f, 74f, 90f, 84f)
-    private var glow = 0.4f
+    private val corePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private var pulseValue = 0.55f
     private var pulse: ValueAnimator? = null
 
     init {
         setLayerType(View.LAYER_TYPE_SOFTWARE, null)
-        crown.moveTo(10f, 68f)
-        crown.lineTo(16f, 24f)
-        crown.lineTo(36f, 44f)
-        crown.lineTo(50f, 10f)
-        crown.lineTo(64f, 44f)
-        crown.lineTo(84f, 24f)
-        crown.lineTo(90f, 68f)
-        crown.close()
-        fill.shader = LinearGradient(
-            0f, 10f, 0f, 84f,
-            intArrayOf(Neon.GREEN_SOFT, Neon.GREEN, Neon.GREEN_DEEP),
-            null, Shader.TileMode.CLAMP
-        )
+        contentDescription = "هسته هوشمند KING AI"
     }
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        pulse = ValueAnimator.ofFloat(0.3f, 1f).apply {
-            duration = 1600
+        pulse = ValueAnimator.ofFloat(0.35f, 1f).apply {
+            duration = 1900
             repeatMode = ValueAnimator.REVERSE
             repeatCount = ValueAnimator.INFINITE
             addUpdateListener {
-                glow = it.animatedValue as Float
+                pulseValue = it.animatedValue as Float
                 invalidate()
             }
             start()
@@ -277,25 +265,76 @@ class CrownView(context: Context) : View(context) {
     }
 
     override fun onDraw(canvas: Canvas) {
-        val s = minOf(width / 120f, height / 110f)
+        super.onDraw(canvas)
+        val size = minOf(width, height).toFloat()
+        if (size <= 0f) return
+        val scale = size / 100f
+        val cx = width / 2f
+        val cy = height / 2f
         canvas.save()
-        canvas.translate((width - 120f * s) / 2f, (height - 110f * s) / 2f)
-        canvas.scale(s, s)
-        canvas.translate(10f, 10f)
+        canvas.translate(cx - 50f * scale, cy - 50f * scale)
+        canvas.scale(scale, scale)
 
-        fill.setShadowLayer((6f + 20f * glow) * s, 0f, 0f, Neon.GREEN)
-        canvas.drawPath(crown, fill)
-        canvas.drawPath(crown, outline)
-        canvas.drawRoundRect(band, 4f, 4f, fill)
-        canvas.drawRoundRect(band, 4f, 4f, outline)
+        // هاله‌ی مرکزی
+        glowPaint.shader = RadialGradient(
+            50f, 50f, 43f,
+            intArrayOf(0x6639FF14, 0x2239FF14, Color.TRANSPARENT),
+            floatArrayOf(0f, 0.62f, 1f), Shader.TileMode.CLAMP
+        )
+        canvas.drawCircle(50f, 50f, 43f, glowPaint)
 
-        val tips = floatArrayOf(16f, 24f, 50f, 10f, 84f, 24f)
-        var i = 0
-        while (i < tips.size) {
-            canvas.drawCircle(tips[i], tips[i + 1], 3.5f, jewel)
-            canvas.drawCircle(tips[i], tips[i + 1], 3.5f, outline)
-            i += 2
+        // شش‌ضلعی مدار
+        val hex = Path().apply {
+            moveTo(50f, 12f)
+            lineTo(82f, 31f)
+            lineTo(82f, 69f)
+            lineTo(50f, 88f)
+            lineTo(18f, 69f)
+            lineTo(18f, 31f)
+            close()
         }
+        linePaint.alpha = (130 + 100 * pulseValue).toInt()
+        linePaint.strokeWidth = 2.1f
+        canvas.drawPath(hex, linePaint)
+
+        // مسیرهای اتصال به هسته
+        val routes = listOf(
+            floatArrayOf(50f, 12f, 50f, 31f),
+            floatArrayOf(82f, 31f, 65f, 41f),
+            floatArrayOf(82f, 69f, 65f, 59f),
+            floatArrayOf(50f, 88f, 50f, 69f),
+            floatArrayOf(18f, 69f, 35f, 59f),
+            floatArrayOf(18f, 31f, 35f, 41f)
+        )
+        for (p in routes) canvas.drawLine(p[0], p[1], p[2], p[3], linePaint)
+
+        // هسته‌ی سه‌بعدی
+        corePaint.shader = RadialGradient(
+            43f, 39f, 24f,
+            intArrayOf(0xFFE5FFE0.toInt(), Neon.GREEN, 0xFF087B2B.toInt()),
+            floatArrayOf(0f, 0.38f, 1f), Shader.TileMode.CLAMP
+        )
+        corePaint.setShadowLayer(7f + 10f * pulseValue, 0f, 0f, Neon.GREEN)
+        canvas.drawCircle(50f, 50f, 17f, corePaint)
+
+        // گره‌های مدار
+        val nodes = arrayOf(
+            floatArrayOf(50f, 12f), floatArrayOf(82f, 31f),
+            floatArrayOf(82f, 69f), floatArrayOf(50f, 88f),
+            floatArrayOf(18f, 69f), floatArrayOf(18f, 31f)
+        )
+        for (p in nodes) {
+            canvas.drawCircle(p[0], p[1], 4.2f, glowPaint.apply {
+                color = 0x5539FF14
+                shader = null
+            })
+            canvas.drawCircle(p[0], p[1], 2.8f, nodePaint)
+        }
+        canvas.drawCircle(50f, 50f, 4f, nodePaint)
+
+        glowPaint.shader = null
+        corePaint.shader = null
+        corePaint.clearShadowLayer()
         canvas.restore()
     }
 }
