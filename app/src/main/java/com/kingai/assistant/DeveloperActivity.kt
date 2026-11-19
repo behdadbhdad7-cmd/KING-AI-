@@ -32,6 +32,7 @@ class DeveloperActivity : ComponentActivity() {
     private lateinit var saveProjectZipButton: TextView
     private lateinit var previewButton: TextView
     private lateinit var saveHtmlButton: TextView
+    private lateinit var copyActions: LinearLayout
 
     private val modes = listOf(
         "رفع خطا و اصلاح کد", "ساخت کد جدید",
@@ -196,6 +197,8 @@ class DeveloperActivity : ComponentActivity() {
         output.setPadding(0, dp(12), 0, dp(8))
         output.setTextIsSelectable(true)
         resultCard.addView(output)
+        copyActions = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
+        resultCard.addView(copyActions, top(6))
         content.addView(resultCard, top(9))
 
         scroll.addView(content)
@@ -325,6 +328,14 @@ class DeveloperActivity : ComponentActivity() {
             append("\n- مسیر فایل، وابستگی‌ها و دستور اجرای لازم را مشخص کن.")
             append("\n- اگر خطا را اصلاح می‌کنی، علت و نسخه‌ی کامل اصلاح‌شده را ارائه بده.")
             append("\n- اگر اطلاعات لازم کم است، فقط سؤال ضروری را بپرس.")
+            append("\n- پیش از کدنویسی، نیازمندی‌ها، محیط اجرا، نسخه زبان و محدودیت‌های پروژه را بررسی کن؛ اگر فایل پروژه انتخاب شده، قراردادها و سبک همان پروژه را حفظ کن.")
+            append("\n- کد باید کامل و قابل کپی باشد: importها، تعریف‌ها، مدیریت خطا و اتصال اجزا را جا نینداز؛ از سه‌نقطه و شبه‌کد به‌جای پیاده‌سازی استفاده نکن.")
+            append("\n- برای پروژه چندفایلی، درخت فایل‌ها و مسیر دقیق هر فایل را مشخص کن و هر فایل را در بلوک کد جداگانه با زبان درست بنویس.")
+            append("\n- API یا کتابخانه خیالی نساز؛ نسخه‌های Gradle، Android SDK، کتابخانه‌ها و زبان را با فایل‌های پروژه تطبیق بده. اگر نسخه معلوم نیست، عدم‌قطعیت را بگو.")
+            append("\n- در رفع خطا، علت را از حدس جدا کن، کمترین تغییر لازم را انجام بده و فایل/بخش کامل اصلاح‌شده را ارائه کن.")
+            append("\n- تست‌های واحد، ورودی مرزی و حالت خطا را متناسب با کد پیشنهاد بده. اگر کامپایل یا تست را واقعاً اجرا نکرده‌ای، صریحاً بگو تأیید نشده است.")
+            append("\n- قبل از تحویل، کد را از نظر syntax، import، نام‌ها، nullability، lifecycle، امنیت، کارایی و سازگاری مرور کن؛ فقط خلاصه نتیجه را بگو و زنجیره فکر پنهان را ننویس.")
+            append("\n- اگر خروجی خیلی بزرگ است، به فایل‌ها/بخش‌های منظم تقسیم کن و ادامه را دقیق علامت بزن؛ خروجی ناقص را کامل معرفی نکن.")
             append("\n- هیچ فایل یا تنظیمی را خودکار تغییر نده و ادعای اجرای کد نکن.")
         }
         runButton.isEnabled = false
@@ -344,6 +355,7 @@ class DeveloperActivity : ComponentActivity() {
             lastAnswer = if (result.success) result.message else ""
             lastHtml = ""
             projectZip = if (result.success && selectedMode == "ساخت پروژه اندروید") buildProjectZip(result.message) else ByteArray(0)
+            refreshCopyActions(lastAnswer)
         }
     }
 
@@ -422,6 +434,27 @@ class DeveloperActivity : ComponentActivity() {
             }
         }
         return depth == 0
+    }
+
+    private fun refreshCopyActions(answer: String) {
+        if (!::copyActions.isInitialized) return
+        copyActions.removeAllViews()
+        if (answer.isBlank()) { copyActions.visibility = View.GONE; return }
+        copyActions.visibility = View.VISIBLE
+        copyActions.addView(actionButton("کپی کل پاسخ") { copyToClipboard("پاسخ KING AI", answer) }, LinearLayout.LayoutParams(-1, dp(42)))
+        val fence = 96.toChar().toString().repeat(3)
+        val blocks = Regex(fence + "([\\w+#.-]*)\\s*\\n([\\s\\S]*?)" + fence).findAll(answer).toList()
+        blocks.forEachIndexed { index, match ->
+            val language = match.groupValues[1].ifBlank { "متن" }
+            val code = match.groupValues[2].trim()
+            if (code.isNotBlank()) copyActions.addView(actionButton("کپی کد ${index + 1} • $language") { copyToClipboard("کد ${index + 1} ($language)", code) }, LinearLayout.LayoutParams(-1, dp(40)).apply { topMargin = dp(6) })
+        }
+    }
+
+    private fun copyToClipboard(label: String, value: String) {
+        val clipboard = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText(label, value))
+        toast("متن کپی شد.")
     }
 
     private fun buildProjectZip(answer: String): ByteArray {
