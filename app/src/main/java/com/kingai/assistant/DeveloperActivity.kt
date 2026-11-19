@@ -371,6 +371,7 @@ class DeveloperActivity : ComponentActivity() {
             runButton.alpha = 1f
             lastAnswer = accumulatedAnswer
             lastHtml = html
+            refreshCopyActions(lastAnswer)
             output.text = "✓ فایل HTML کامل شد و بررسی اولیه‌ی ساختار را گذراند. حالا می‌توانی پیش‌نمایش بگیری."
             return
         }
@@ -379,6 +380,7 @@ class DeveloperActivity : ComponentActivity() {
             runButton.alpha = 1f
             lastAnswer = accumulatedAnswer
             lastHtml = ""
+            refreshCopyActions(lastAnswer)
             output.text = "خروجی HTML هنوز ناقص است؛ برای جلوگیری از نمایش صفحه‌ی خالی، پیش‌نمایش و ذخیره‌ی HTML غیرفعال ماند. دوباره درخواست ساخت را اجرا کن یا از مدل بخواه سایت را در بخش‌های کوچک‌تر بسازد."
             return
         }
