@@ -143,7 +143,7 @@ object ApiConfig {
     }
 
     fun getMaxTokens(context: Context): Int =
-        prefs(context).getInt(MAX_TOKENS, 2048).coerceIn(256, 8192)
+        prefs(context).getInt(MAX_TOKENS, 4096).coerceIn(256, 8192)
 
     fun getBaseUrl(context: Context): String =
         prefs(context).getString(BASE_URL, "") ?: ""
