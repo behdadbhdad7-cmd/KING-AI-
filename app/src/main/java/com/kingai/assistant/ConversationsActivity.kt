@@ -185,7 +185,13 @@ class ConversationsActivity : ComponentActivity() {
             orientation = LinearLayout.VERTICAL
             gravity = if (user) Gravity.START else Gravity.END
             addView(bubble)
+            bubble.setOnLongClickListener {
+                copyToClipboard("پاسخ KING AI", value)
+                true
+            }
             if (canSave) {
+                addCodeCopyActions(this, value)
+
                 val fence = 96.toChar().toString().repeat(3)
                 val html = Regex(fence + "(?:html)?\\s*([\\s\\S]*?)" + fence, RegexOption.IGNORE_CASE)
                     .find(value)?.groupValues?.getOrNull(1)?.trim()
@@ -258,6 +264,33 @@ class ConversationsActivity : ComponentActivity() {
             }
             .setNegativeButton("بستن", null)
             .show()
+    }
+
+    private fun addCodeCopyActions(container: LinearLayout, answer: String) {
+        val fence = 96.toChar().toString().repeat(3)
+        val blocks = Regex(fence + "([\\w+#.-]*)\\s*\\n([\\s\\S]*?)" + fence).findAll(answer).toList()
+        blocks.forEachIndexed { index, match ->
+            val language = match.groupValues[1].ifBlank { "متن" }
+            val code = match.groupValues[2].trim()
+            if (code.isNotBlank()) {
+                val copy = TextView(this).apply {
+                    text = "▣  کپی کد ${index + 1} • $language"
+                    textSize = 12f
+                    setTextColor(green)
+                    setPadding(dp(10), dp(9), dp(10), dp(7))
+                    isClickable = true
+                    isFocusable = true
+                    setOnClickListener { copyToClipboard("کد ${index + 1} ($language)", code) }
+                }
+                container.addView(copy)
+            }
+        }
+    }
+
+    private fun copyToClipboard(label: String, value: String) {
+        val clipboard = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText(label, value))
+        android.widget.Toast.makeText(this, "متن کپی شد.", android.widget.Toast.LENGTH_SHORT).show()
     }
 
     private fun scrollBottom() {
