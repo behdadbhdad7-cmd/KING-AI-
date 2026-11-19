@@ -183,6 +183,8 @@ object UpdateManager {
                 .setTitle("اجازه نصب بروزرسانی")
                 .setMessage("برای نصب نسخه جدید، اجازه نصب برنامه از KING AI را در تنظیمات اندروید فعال کن.")
                 .setPositiveButton("رفتن به تنظیمات") { _, _ ->
+                    activity.getSharedPreferences("king_update", Context.MODE_PRIVATE)
+                        .edit().putBoolean("awaiting_install_permission", true).apply()
                     activity.startActivity(
                         Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                             Uri.parse("package:" + activity.packageName))
@@ -207,9 +209,11 @@ object UpdateManager {
         }
     }
 
-    fun installDownloadedIfAllowed(activity: HomeActivity) {
-        val apk = File(activity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), APK_FILE)
-        if (apk.isFile && android.os.Build.VERSION.SDK_INT >= 26 &&
+    fun resumePendingInstall(activity: HomeActivity) {
+        val prefs = activity.getSharedPreferences("king_update", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("awaiting_install_permission", false)) return
+        prefs.edit().remove("awaiting_install_permission").apply()
+        if (android.os.Build.VERSION.SDK_INT >= 26 &&
             activity.packageManager.canRequestPackageInstalls()) {
             installDownloaded(activity)
         }
