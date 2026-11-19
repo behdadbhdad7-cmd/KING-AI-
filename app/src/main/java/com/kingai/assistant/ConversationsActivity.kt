@@ -104,7 +104,8 @@ class ConversationsActivity : ComponentActivity() {
             setHintTextColor(0xFF789581.toInt())
             setTextColor(Color.WHITE)
             textSize = getChatTextSize()
-            typeface = getChatTypeface()\n            background = null
+            typeface = getChatTypeface()
+            background = null
             setSingleLine(true)
             imeOptions = EditorInfo.IME_ACTION_SEND
             setPadding(dp(8), dp(8), dp(8), dp(8))
@@ -169,7 +170,9 @@ class ConversationsActivity : ComponentActivity() {
         }
         val bubble = TextView(this).apply {
             text = value
-            textSize = getChatTextSize()\n            typeface = getChatTypeface()\n            setTextColor(if (user) Color.WHITE else 0xFFE7F5EA.toInt())
+            textSize = getChatTextSize()
+            typeface = getChatTypeface()
+            setTextColor(if (user) Color.WHITE else 0xFFE7F5EA.toInt())
             setPadding(dp(14), dp(11), dp(14), dp(11))
             background = GradientDrawable().apply {
                 cornerRadius = dp(14).toFloat()
