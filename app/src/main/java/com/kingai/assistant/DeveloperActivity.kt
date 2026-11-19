@@ -396,7 +396,7 @@ class DeveloperActivity : ComponentActivity() {
             val nextAnswer = if (fragment.contains(Regex("<\\s*(?:!doctype|html)", RegexOption.IGNORE_CASE))) {
                 continuation.message
             } else {
-                accumulatedAnswer + "\n" + fragment
+                " ```html\n" + html + "\n" + fragment + "\n```"
             }
             continueWebsiteGeneration(originalPrompt, nextAnswer, attemptsLeft - 1)
         }
