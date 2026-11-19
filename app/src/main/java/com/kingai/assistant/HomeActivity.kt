@@ -64,6 +64,7 @@ class HomeActivity : ComponentActivity() {
         window.navigationBarColor = Color.rgb(2, 6, 4)
         window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         setContentView(buildUi())
+        UpdateManager.checkAndPrompt(this)
     }
 
     private fun buildUi(): View {
@@ -400,6 +401,10 @@ class HomeActivity : ComponentActivity() {
         val popup = PopupWindow(menuScroll, -2, popupHeight, true).apply {
             elevation = dp(12).toFloat()
             setBackgroundDrawable(GradientDrawable().apply { setColor(Color.TRANSPARENT) })
+        }
+        item("بررسی بروزرسانی KING AI") {
+            popup.dismiss()
+            UpdateManager.checkAndPrompt(this, force = true)
         }
         item("گفت‌وگوی جدید") {
             activeConversationId = null
