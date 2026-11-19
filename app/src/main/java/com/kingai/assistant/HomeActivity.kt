@@ -67,6 +67,11 @@ class HomeActivity : ComponentActivity() {
         UpdateManager.checkAndPrompt(this)
     }
 
+    override fun onResume() {
+        super.onResume()
+        UpdateManager.resumePendingInstall(this)
+    }
+
     private fun buildUi(): View {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
