@@ -103,7 +103,8 @@ class ConversationsActivity : ComponentActivity() {
             hint = "ادامه این گفتگو را بنویس..."
             setHintTextColor(0xFF789581.toInt())
             setTextColor(Color.WHITE)
-            textSize = getChatTextSize()\n            typeface = getChatTypeface()\n            background = null
+            textSize = getChatTextSize()
+            typeface = getChatTypeface()\n            background = null
             setSingleLine(true)
             imeOptions = EditorInfo.IME_ACTION_SEND
             setPadding(dp(8), dp(8), dp(8), dp(8))
