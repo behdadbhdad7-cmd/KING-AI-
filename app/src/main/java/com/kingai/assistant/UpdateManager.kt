@@ -87,85 +87,20 @@ object UpdateManager {
         try {
             val request = DownloadManager.Request(Uri.parse(apkUrl))
                 .setTitle("دانلود بروزرسانی KING AI")
-                .setDescription("دریافت نسخه جدید برنامه")
+                .setDescription("فایل بروزرسانی در پس‌زمینه دریافت می‌شود")
                 .setMimeType("application/vnd.android.package-archive")
                 .setAllowedOverMetered(true)
                 .setAllowedOverRoaming(false)
-                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                 .setDestinationInExternalFilesDir(activity, Environment.DIRECTORY_DOWNLOADS, APK_FILE)
-
             val manager = activity.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-            val downloadId = manager.enqueue(request)
-
-            val container = LinearLayout(activity).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(36, 20, 36, 8)
-            }
-            val label = TextView(activity).apply {
-                text = "در حال دریافت نسخه جدید..."
-                textSize = 14f
-            }
-            val progress = ProgressBar(activity, null, android.R.attr.progressBarStyleHorizontal).apply {
-                isIndeterminate = true
-                max = 100
-            }
-            container.addView(label)
-            container.addView(progress, LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = 18 })
-
-            val dialog = AlertDialog.Builder(activity)
-                .setTitle("بروزرسانی KING AI")
-                .setView(container)
-                .setCancelable(false)
-                .create()
-            dialog.show()
-
-            val poll = object : Runnable {
-                override fun run() {
-                    if (activity.isFinishing || activity.isDestroyed) {
-                        main.removeCallbacks(this)
-                        return
-                    }
-                    val cursor = manager.query(DownloadManager.Query().setFilterById(downloadId))
-                    cursor.use {
-                        if (!it.moveToFirst()) {
-                            dialog.dismiss()
-                            showError(activity, "وضعیت دانلود پیدا نشد.")
-                            return
-                        }
-                        val status = it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
-                        when (status) {
-                            DownloadManager.STATUS_SUCCESSFUL -> {
-                                main.removeCallbacks(this)
-                                dialog.dismiss()
-                                installDownloaded(activity)
-                            }
-                            DownloadManager.STATUS_FAILED -> {
-                                main.removeCallbacks(this)
-                                val reason = it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
-                                dialog.dismiss()
-                                showError(activity, "دانلود ناموفق بود. کد خطا: $reason")
-                            }
-                            else -> {
-                                val total = it.getLong(it.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
-                                val done = it.getLong(it.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
-                                if (total > 0) {
-                                    val percent = ((done * 100L) / total).toInt().coerceIn(0, 100)
-                                    progress.isIndeterminate = false
-                                    progress.progress = percent
-                                    label.text = "در حال دانلود... $percent٪"
-                                } else {
-                                    progress.isIndeterminate = true
-                                    label.text = "در حال دریافت نسخه جدید..."
-                                }
-                                main.postDelayed(this, 500)
-                            }
-                        }
-                    }
-                }
-            }
-            main.post(poll)
+            manager.enqueue(request)
+            android.widget.Toast.makeText(
+                activity,
+                "دانلود شروع شد؛ از اعلان دانلود، نصب نسخه جدید را باز کن.",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+            activity.finish()
         } catch (_: Exception) {
             showError(activity, "شروع دانلود بروزرسانی ممکن نشد.")
         }
