@@ -103,7 +103,8 @@ class ConversationsActivity : ComponentActivity() {
             hint = "ادامه این گفتگو را بنویس..."
             setHintTextColor(0xFF789581.toInt())
             setTextColor(Color.WHITE)
-            textSize = 14f
+            textSize = getChatTextSize()
+            typeface = getChatTypeface()
             background = null
             setSingleLine(true)
             imeOptions = EditorInfo.IME_ACTION_SEND
@@ -169,7 +170,8 @@ class ConversationsActivity : ComponentActivity() {
         }
         val bubble = TextView(this).apply {
             text = value
-            textSize = 14f
+            textSize = getChatTextSize()
+            typeface = getChatTypeface()
             setTextColor(if (user) Color.WHITE else 0xFFE7F5EA.toInt())
             setPadding(dp(14), dp(11), dp(14), dp(11))
             background = GradientDrawable().apply {
@@ -209,6 +211,55 @@ class ConversationsActivity : ComponentActivity() {
         return row
     }
 
+
+    private fun appearancePrefs() = getSharedPreferences("king_chat_appearance", MODE_PRIVATE)
+
+    private fun getChatTextSize(): Float =
+        appearancePrefs().getFloat("text_size", 16f).coerceIn(14f, 22f)
+
+    private fun getChatTypeface(): Typeface {
+        return when (appearancePrefs().getString("font_family", "default")) {
+            "serif" -> Typeface.SERIF
+            "mono" -> Typeface.MONOSPACE
+            else -> Typeface.DEFAULT
+        }
+    }
+
+    private fun showTextAppearanceDialog() {
+        val sizes = arrayOf("۱۴", "۱۶", "۱۸", "۲۰", "۲۲")
+        val values = floatArrayOf(14f, 16f, 18f, 20f, 22f)
+        val current = getChatTextSize()
+        val selected = values.indices.minByOrNull { kotlin.math.abs(values[it] - current) } ?: 1
+        android.app.AlertDialog.Builder(this)
+            .setTitle("اندازه نوشته گفتگو")
+            .setSingleChoiceItems(sizes, selected) { dialog, which ->
+                appearancePrefs().edit().putFloat("text_size", values[which]).apply()
+                dialog.dismiss()
+                activeId?.let { showConversation(it) }
+            }
+            .setNegativeButton("بستن", null)
+            .setNeutralButton("انتخاب فونت") { _, _ ->
+                showFontFamilyDialog()
+            }
+            .show()
+    }
+
+    private fun showFontFamilyDialog() {
+        val names = arrayOf("پیش‌فرض دستگاه", "سریف", "تک‌فاصله")
+        val keys = arrayOf("default", "serif", "mono")
+        val current = appearancePrefs().getString("font_family", "default")
+        val selected = keys.indexOf(current).coerceAtLeast(0)
+        android.app.AlertDialog.Builder(this)
+            .setTitle("فونت گفتگو")
+            .setSingleChoiceItems(names, selected) { dialog, which ->
+                appearancePrefs().edit().putString("font_family", keys[which]).apply()
+                dialog.dismiss()
+                activeId?.let { showConversation(it) }
+            }
+            .setNegativeButton("بستن", null)
+            .show()
+    }
+
     private fun scrollBottom() {
         chatScroll.post { chatHost.post { chatScroll.smoothScrollTo(0, chatHost.height) } }
     }
@@ -221,6 +272,14 @@ class ConversationsActivity : ComponentActivity() {
         }
         bar.addView(arrow, LinearLayout.LayoutParams(dp(42), dp(44)))
         bar.addView(label(title, 17f, green, true), LinearLayout.LayoutParams(0, -2, 1f))
+        val fontButton = label("Aa", 16f, green, true).apply {
+            gravity = Gravity.CENTER
+            setPadding(dp(10), dp(6), dp(10), dp(6))
+            background = outline()
+            contentDescription = "تنظیم فونت و اندازه نوشته"
+            setOnClickListener { showTextAppearanceDialog() }
+        }
+        bar.addView(fontButton, LinearLayout.LayoutParams(dp(52), dp(42)))
         return bar
     }
 

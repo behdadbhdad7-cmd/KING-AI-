@@ -375,6 +375,36 @@ class HomeActivity : ComponentActivity() {
             hero.alpha = 1f
             popup.dismiss()
         }
+        item("اندازه نوشته‌های گفتگو") {
+            popup.dismiss()
+            val sizes = arrayOf("۱۴", "۱۶", "۱۸", "۲۰", "۲۲")
+            val values = floatArrayOf(14f, 16f, 18f, 20f, 22f)
+            val selected = values.indices.minByOrNull { kotlin.math.abs(values[it] - getChatTextSize()) } ?: 1
+            android.app.AlertDialog.Builder(this)
+                .setTitle("اندازه نوشته‌های گفتگو")
+                .setSingleChoiceItems(sizes, selected) { dialog, which ->
+                    appearancePrefs().edit().putFloat("text_size", values[which]).apply()
+                    applyChatAppearance()
+                    dialog.dismiss()
+                }
+                .setNegativeButton("بستن", null)
+                .show()
+        }
+        item("فونت گفتگو") {
+            popup.dismiss()
+            val names = arrayOf("پیش‌فرض دستگاه", "سریف", "تک‌فاصله")
+            val keys = arrayOf("default", "serif", "mono")
+            val selected = keys.indexOf(getChatTypefaceKey()).coerceAtLeast(0)
+            android.app.AlertDialog.Builder(this)
+                .setTitle("فونت گفتگو")
+                .setSingleChoiceItems(names, selected) { dialog, which ->
+                    appearancePrefs().edit().putString("font_family", keys[which]).apply()
+                    applyChatAppearance()
+                    dialog.dismiss()
+                }
+                .setNegativeButton("بستن", null)
+                .show()
+        }
         item("گفتگوهای قدیمی") {
             popup.dismiss()
             startActivity(android.content.Intent(this, ConversationsActivity::class.java))
@@ -412,6 +442,36 @@ class HomeActivity : ComponentActivity() {
             startActivity(android.content.Intent(this, MainActivity::class.java))
         }
         popup.showAsDropDown(anchor, -dp(165), dp(6))
+    }
+
+    private fun appearancePrefs() = getSharedPreferences("king_chat_appearance", MODE_PRIVATE)
+
+    private fun getChatTextSize(): Float =
+        appearancePrefs().getFloat("text_size", 16f).coerceIn(14f, 22f)
+
+    private fun getChatTypefaceKey(): String =
+        appearancePrefs().getString("font_family", "default") ?: "default"
+
+    private fun getChatTypeface(): Typeface = when (getChatTypefaceKey()) {
+        "serif" -> Typeface.SERIF
+        "mono" -> Typeface.MONOSPACE
+        else -> Typeface.DEFAULT
+    }
+
+    /** اعمال ظاهر انتخاب‌شده روی حباب‌های صفحه اصلی و کادر نوشتن */
+    private fun applyChatAppearance() {
+        val size = getChatTextSize()
+        val face = getChatTypeface()
+        if (::input.isInitialized) input.textSize = size
+        if (::messages.isInitialized) {
+            for (i in 0 until messages.childCount) {
+                val row = messages.getChildAt(i) as? LinearLayout ?: continue
+                val content = row.getChildAt(0) as? LinearLayout ?: continue
+                val bubble = content.getChildAt(0) as? TextView ?: continue
+                bubble.textSize = size
+                bubble.typeface = face
+            }
+        }
     }
 
     private fun text(value: String, size: Float, color: Int, bold: Boolean = false) =
