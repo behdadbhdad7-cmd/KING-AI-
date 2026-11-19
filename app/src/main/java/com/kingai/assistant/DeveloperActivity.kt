@@ -333,16 +333,95 @@ class DeveloperActivity : ComponentActivity() {
         lastAnswer = ""
         ApiClient.sendMessage(this, prompt, includeMemory = false) { result ->
             if (isFinishing || isDestroyed) return@sendMessage
+            if (selectedMode == "طراحی وب‌سایت" && result.success) {
+                output.text = "کد دریافت شد؛ در حال بررسی کامل‌بودن HTML…"
+                continueWebsiteGeneration(prompt, result.message, 2)
+                return@sendMessage
+            }
             runButton.isEnabled = true
             runButton.alpha = 1f
             output.text = result.message
             lastAnswer = if (result.success) result.message else ""
-            lastHtml = if (result.success && selectedMode == "طراحی وب‌سایت") extractHtml(result.message) else ""
+            lastHtml = ""
             projectZip = if (result.success && selectedMode == "ساخت پروژه اندروید") buildProjectZip(result.message) else ByteArray(0)
-            if (selectedMode == "طراحی وب‌سایت" && result.success && lastHtml.isBlank()) {
-                output.text = result.message + "\\n\\nکد HTML کامل در قالب قابل پیش‌نمایش پیدا نشد؛ از KING AI بخواه فقط یک بلوک HTML کامل تحویل بدهد."
+        }
+    }
+
+    /**
+     * خروجی وب را اعتبارسنجی می‌کند و اگر مدل وسط فایل متوقف شده باشد،
+     * حداکثر دو بار از همان گفتگو ادامه‌ی دقیق فایل را درخواست می‌کند.
+     */
+    private fun continueWebsiteGeneration(originalPrompt: String, accumulatedAnswer: String, attemptsLeft: Int) {
+        if (isFinishing || isDestroyed) return
+        val html = extractHtml(accumulatedAnswer)
+        if (html.isNotBlank() && isCompleteHtml(html)) {
+            runButton.isEnabled = true
+            runButton.alpha = 1f
+            lastAnswer = accumulatedAnswer
+            lastHtml = html
+            output.text = "✓ فایل HTML کامل شد و بررسی اولیه‌ی ساختار را گذراند. حالا می‌توانی پیش‌نمایش بگیری."
+            return
+        }
+        if (attemptsLeft <= 0 || html.isBlank()) {
+            runButton.isEnabled = true
+            runButton.alpha = 1f
+            lastAnswer = accumulatedAnswer
+            lastHtml = ""
+            output.text = "خروجی HTML هنوز ناقص است؛ برای جلوگیری از نمایش صفحه‌ی خالی، پیش‌نمایش و ذخیره‌ی HTML غیرفعال ماند. دوباره درخواست ساخت را اجرا کن یا از مدل بخواه سایت را در بخش‌های کوچک‌تر بسازد."
+            return
+        }
+
+        output.text = "HTML ناقص تشخیص داده شد؛ KING AI در حال تکمیل خودکار فایل است…"
+        val messages = listOf(
+            ConversationMessage("user", originalPrompt),
+            ConversationMessage("assistant", accumulatedAnswer),
+            ConversationMessage(
+                "user",
+                "فایل HTML قبلی در میانه‌ی کد قطع شده است. فقط ادامه‌ی دقیق همان فایل را از اولین کاراکتر بعد از آخرین کاراکتر خروجی قبلی تولید کن؛ هیچ قسمت قبلی را تکرار نکن، توضیح نده و کل ادامه را در یک بلوک html بده. تمام تگ‌ها، آکولادهای CSS/JavaScript و تگ‌های پایانی body و html را کامل ببند. اگر برای تکمیل در یک پاسخ جا نمی‌شود، ادامه را کوتاه و منسجم نگه دار."
+            )
+        )
+        ApiClient.sendConversation(this, messages, includeMemory = false) { continuation ->
+            if (isFinishing || isDestroyed) return@sendConversation
+            if (!continuation.success) {
+                runButton.isEnabled = true
+                runButton.alpha = 1f
+                lastAnswer = accumulatedAnswer
+                lastHtml = ""
+                output.text = "تکمیل خودکار ناموفق شد: ${continuation.message}\nبرای جلوگیری از پیش‌نمایش خراب، فایل ناقص پذیرفته نشد."
+                return@sendConversation
+            }
+            val fragment = continuation.message
+                .replace(Regex("^\\s*```(?:html)?\\s*", RegexOption.IGNORE_CASE), "")
+                .replace(Regex("\\s*```\\s*$"), "")
+            val nextAnswer = if (fragment.contains(Regex("<\\s*(?:!doctype|html)", RegexOption.IGNORE_CASE))) {
+                continuation.message
+            } else {
+                " ```html\n" + html + "\n" + fragment + "\n```"
+            }
+            continueWebsiteGeneration(originalPrompt, nextAnswer, attemptsLeft - 1)
+        }
+    }
+
+    /** بررسی محافظه‌کارانه‌ی ساختار؛ جایگزین اعتبارسنجی کامل مرورگر نیست. */
+    private fun isCompleteHtml(html: String): Boolean {
+        if (!html.contains(Regex("<\\s*!doctype\\s+html", RegexOption.IGNORE_CASE)) &&
+            !html.contains(Regex("<\\s*html(?:\\s|>)", RegexOption.IGNORE_CASE))) return false
+        if (!html.contains(Regex("</\\s*html\\s*>", RegexOption.IGNORE_CASE))) return false
+        if (!html.contains(Regex("</\\s*body\\s*>", RegexOption.IGNORE_CASE))) return false
+        for (tag in listOf("style", "script")) {
+            val opened = Regex("<\\s*$tag(?:\\s|>)", RegexOption.IGNORE_CASE).findAll(html).count()
+            val closed = Regex("</\\s*$tag\\s*>", RegexOption.IGNORE_CASE).findAll(html).count()
+            if (opened != closed) return false
+        }
+        var depth = 0
+        html.forEach { ch ->
+            if (ch == '{') depth++
+            if (ch == '}') {
+                depth--
+                if (depth < 0) return false
             }
         }
+        return depth == 0
     }
 
     private fun buildProjectZip(answer: String): ByteArray {
