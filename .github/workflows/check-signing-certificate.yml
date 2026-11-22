@@ -1,0 +1,27 @@
+name: Check KING AI signing certificate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fingerprint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check signing certificate fingerprint
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.KING_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KING_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KING_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$KEYSTORE_B64" || -z "$KEYSTORE_PASSWORD" || -z "$KEY_ALIAS" ]]; then
+            echo "Missing one or more required signing secrets."
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/kingai-signing.keystore"
+          keytool -list -v -keystore "$RUNNER_TEMP/kingai-signing.keystore" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" 2>/dev/null | grep -E 'SHA256:|SHA-256:'
+          rm -f "$RUNNER_TEMP/kingai-signing.keystore"
