@@ -20,6 +20,10 @@ class TelegramAccountManager private constructor(context: Context) {
     companion object {
         const val ACCOUNT_ONE = "account1"
         const val ACCOUNT_TWO = "account2"
+        const val ACCOUNT_THREE = "account3"
+
+        private fun isSupportedAccount(id: String): Boolean =
+            id == ACCOUNT_ONE || id == ACCOUNT_TWO || id == ACCOUNT_THREE
 
         @Volatile
         private var instance: TelegramAccountManager? = null
@@ -71,7 +75,8 @@ class TelegramAccountManager private constructor(context: Context) {
     private val _accounts = MutableStateFlow(
         mapOf(
             ACCOUNT_ONE to AccountInfo(ACCOUNT_ONE),
-            ACCOUNT_TWO to AccountInfo(ACCOUNT_TWO)
+            ACCOUNT_TWO to AccountInfo(ACCOUNT_TWO),
+            ACCOUNT_THREE to AccountInfo(ACCOUNT_THREE)
         )
     )
 
@@ -82,7 +87,8 @@ class TelegramAccountManager private constructor(context: Context) {
         MutableStateFlow<Map<String, List<IncomingMessage>>>(
             mapOf(
                 ACCOUNT_ONE to emptyList(),
-                ACCOUNT_TWO to emptyList()
+                ACCOUNT_TWO to emptyList(),
+                ACCOUNT_THREE to emptyList()
             )
         )
 
@@ -123,7 +129,7 @@ class TelegramAccountManager private constructor(context: Context) {
     }
 
     fun clearMessages(id: String) {
-        if (id != ACCOUNT_ONE && id != ACCOUNT_TWO) return
+        if (!isSupportedAccount(id)) return
 
         _messages.value = _messages.value.toMutableMap().apply {
             put(id, emptyList())
@@ -131,7 +137,7 @@ class TelegramAccountManager private constructor(context: Context) {
     }
 
     fun setAutoReplyEnabled(id: String, enabled: Boolean) {
-        if (id != ACCOUNT_ONE && id != ACCOUNT_TWO) return
+        if (!isSupportedAccount(id)) return
 
         autoReplyPreferences.edit()
             .putBoolean("enabled_$id", enabled)
@@ -139,7 +145,7 @@ class TelegramAccountManager private constructor(context: Context) {
     }
 
     fun isAutoReplyEnabled(id: String): Boolean {
-        if (id != ACCOUNT_ONE && id != ACCOUNT_TWO) return false
+        if (!isSupportedAccount(id)) return false
 
         return autoReplyPreferences.getBoolean("enabled_$id", false)
     }
@@ -302,7 +308,7 @@ class TelegramAccountManager private constructor(context: Context) {
     }
 
     fun rememberAccount(id: String) {
-        if (id != ACCOUNT_ONE && id != ACCOUNT_TWO) return
+        if (!isSupportedAccount(id)) return
 
         val saved = preferences.getStringSet(
             "saved_account_ids",
@@ -336,14 +342,14 @@ class TelegramAccountManager private constructor(context: Context) {
         ) ?: emptySet()
 
         saved.forEach { id ->
-            if (id == ACCOUNT_ONE || id == ACCOUNT_TWO) {
+            if (isSupportedAccount(id)) {
                 startAccount(id)
             }
         }
     }
 
     fun startAccount(id: String): Boolean {
-        if (id != ACCOUNT_ONE && id != ACCOUNT_TWO) return false
+        if (!isSupportedAccount(id)) return false
         if (clients.containsKey(id)) return true
 
         val apiId = BuildConfig.TELEGRAM_API_ID.toIntOrNull()
@@ -682,7 +688,7 @@ class TelegramAccountManager private constructor(context: Context) {
     }
 
     fun closeAccount(id: String) {
-        if (id != ACCOUNT_ONE && id != ACCOUNT_TWO) return
+        if (!isSupportedAccount(id)) return
 
         clients.remove(id)?.let {
             try {
@@ -700,7 +706,7 @@ class TelegramAccountManager private constructor(context: Context) {
     }
 
     fun logoutAccount(id: String) {
-        if (id != ACCOUNT_ONE && id != ACCOUNT_TWO) return
+        if (!isSupportedAccount(id)) return
 
         val client = clients[id]
 
@@ -727,7 +733,7 @@ class TelegramAccountManager private constructor(context: Context) {
     }
 
     fun removeAccount(id: String) {
-        if (id != ACCOUNT_ONE && id != ACCOUNT_TWO) return
+        if (!isSupportedAccount(id)) return
 
         forgetAccount(id)
 
