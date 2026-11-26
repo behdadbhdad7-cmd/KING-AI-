@@ -29,10 +29,11 @@ class TelegramAccountsActivity : Activity() {
 
     private val ids = listOf(
         TelegramAccountManager.ACCOUNT_ONE,
-        TelegramAccountManager.ACCOUNT_TWO
+        TelegramAccountManager.ACCOUNT_TWO,
+        TelegramAccountManager.ACCOUNT_THREE
     )
 
-    private val names = listOf("حساب ۱", "حساب ۲")
+    private val names = listOf("حساب ۱", "حساب ۲", "حساب ۳")
 
     private val added = mutableSetOf<String>()
     private val preferences by lazy {
@@ -217,7 +218,7 @@ class TelegramAccountsActivity : Activity() {
         makeRoot()
 
         addTitle("KING AI")
-        addDescription("مرکز مدیریت حساب‌های تلگرام")
+        addDescription("هر کاربر با شماره و کد ورود حساب تلگرام خودش متصل می‌شود؛ حساب تلگرام مالک در برنامه قرار ندارد.")
 
         ids.forEachIndexed { index, id ->
             if (id in added) {
